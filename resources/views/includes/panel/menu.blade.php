@@ -1,7 +1,14 @@
 <!-- Navigation -->
          <!-- Heading -->
-        <h6 class="navbar-heading text-muted">Gestionar datos</h6>
+        <h6 class="navbar-heading text-muted">
+           @if(auth()->user()->role == 'admin')
+                Gestionar datos
+           @else
+              Menú
+           @endif
+        </h6>
         <ul class="navbar-nav">
+      @if(auth()->user()->role == 'admin')
           <li class="nav-item">
              <a class="nav-link" href="/home">
               <i class="ni ni-tv-2 text-primary"></i> Dashboard
@@ -22,6 +29,36 @@
               <i class="ni ni-satisfied text-info"></i> Pacientes
             </a>
           </li>
+      @elseif (auth()->user()->role == 'doctor')
+       <li class="nav-item">
+             <a class="nav-link" href="/schedule">
+              <i class="ni ni-calendar-grid-58 text-danger"></i> Gestinar Horario
+            </a>
+          </li>
+           <li class="nav-item">
+             <a class="nav-link" href="/home">
+              <i class="ni ni-time-alarm text-blue"></i> Mis citas
+            </a>
+          </li>
+
+           <li class="nav-item">
+             <a class="nav-link" href="/patients">
+              <i class="ni ni-tv-2 text-info"></i> Mis pacientes
+            </a>
+          </li>
+      @else
+        <li class="nav-item">
+             <a class="nav-link" href="/home">
+              <i class="ni ni-time-alarm text-blue"></i> Reservar cita
+            </a>
+          </li>
+
+           <li class="nav-item">
+             <a class="nav-link" href="/patients">
+              <i class="ni ni-tv-2 text-info"></i> Mis citas
+            </a>
+          </li>
+      @endif
 
             <li class="nav-item">
             <a class="nav-link" href="/appointments">
@@ -42,6 +79,7 @@
 
         </ul>
         <!-- Divider -->
+ @if(auth()->user()->role == 'admin')
         <hr class="my-3">
         <!-- Heading -->
         <h6 class="navbar-heading text-muted">Reportes</h6>
@@ -58,3 +96,4 @@
             </a>
           </li>
         </ul>
+        @endif
