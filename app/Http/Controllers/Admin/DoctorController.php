@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use Illuminate\Http\Request;
 use App\User;
+use App\Specialty;
 use Illuminate\Support\Str;
 use App\Http\Controllers\Controller;
 class DoctorController extends Controller
@@ -27,7 +28,8 @@ class DoctorController extends Controller
     public function create()
     {
         $contra = Str::random(6);
-        return view('doctors.create',compact('contra'));
+        $specialties = Specialty::all();
+        return view('doctors.create',compact('contra','specialties'));
     }
 
     /**
@@ -47,13 +49,16 @@ class DoctorController extends Controller
         ];
         $this->validate($request,$rules);
 
-        User::create(
+        $user = User::create(
             $request->only('name','email','dni','address','phone')
             + [
                 'role' => 'doctor',
                 'password' => bcrypt($request->input('password'))
             ]
         );
+        // asignar especialidades al medico
+        $user->specialties()->attach($request->input('specialties')); // va a recibir el arreglo de las especilaidadex
+
         $notificacion = 'El Médico se ha registrado correctamnete.';
         return redirect('/doctors')->with(compact('notificacion'));
     }
@@ -78,7 +83,9 @@ class DoctorController extends Controller
     public function edit($id)
     {
         $doctor = User::doctors()->findOrFail($id);
-        return view('doctors.edit',compact('doctor'));
+        $specialties = Specialty::all();
+        $specialty_ids = $doctor->specialties()->pluck('specialties.id');
+        return view('doctors.edit',compact('doctor','specialties','specialty_ids'));
     }
 
     /**
@@ -107,6 +114,9 @@ class DoctorController extends Controller
 
         $user->fill($data);
         $user->save();
+
+        $user->specialties()->sync($request->input('specialties'));
+
         $notificacion = 'El Médico se ha actualizado correctamnete.';
         return redirect('/doctors')->with(compact('notificacion'));
     }

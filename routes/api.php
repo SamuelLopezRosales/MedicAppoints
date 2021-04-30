@@ -13,7 +13,33 @@ use Illuminate\Support\Facades\Route;
 | is assigned the "api" middleware group. Enjoy building your API!
 |
 */
+Route::group([
+    'prefix' => 'auth'
+], function () {
 
-Route::middleware('auth:api')->get('/user', function (Request $request) {
-    return $request->user();
+
+    Route::group([
+      'middleware' => 'auth:api'
+    ], function() {
+        Route::get('user', 'AuthController@user');
+    });
 });
+
+Route::get('prueba', 'AuthController@prueba');
+Route::post('signup', 'AuthController@signUp');
+Route::post('login', 'AuthController@login');
+
+
+// devuelve la lista de especialidades
+Route::get('/specialties','SpeicaltyController@index');
+// devuleve los medicos segun la especialidad
+Route::get('/specialties/{specialty}/doctors','SpeicaltyController@doctors');
+// devuleve las horas segun el medico y el dia
+Route::get('/schedule/hours','ScheduleController@hours');
+
+
+Route::middleware('auth:api')->group(function() {
+    Route::get('/user', 'UserController@show');
+    Route::post('logout', 'AuthController@logout');
+});
+

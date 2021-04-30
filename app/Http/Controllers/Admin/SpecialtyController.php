@@ -53,7 +53,7 @@ class SpecialtyController extends Controller
     	return view('specialties.edit', compact('specialty'));
     }
 
-        public function update(Request $request, Specialty $specialty){
+     public function update(Request $request, Specialty $specialty){
     	//dd($resquest->all());
     	$this->performValidation($request);
 

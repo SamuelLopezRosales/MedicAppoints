@@ -1,0 +1,2514 @@
+\documentclass[a4paper]{article}
+
+\usepackage[utf8]{inputenc}
+\usepackage[spanish, es-tabla]{babel}
+\usepackage[utf8]{inputenc}
+\usepackage[all]{genealogytree}
+
+\usepackage{fancyhdr}
+\pagestyle{fancy}
+\fancyhf{}
+\lhead{Sección \thesection}
+\rhead{pag. \thepage}
+
+\usepackage{listings}
+\usepackage{graphics}
+\title{Desarrollo de un sistema web para reservas de cítas}
+\author{Samuel Ricardo López Rosales}
+\date{12/04/2021}
+
+\usepackage{xcolor}
+
+\definecolor{codegreen}{rgb}{0,0.6,0}
+\definecolor{codegray}{rgb}{0.5,0.5,0.5}
+\definecolor{codepurple}{rgb}{0.58,0,0.82}
+\definecolor{backcolour}{rgb}{0.95,0.95,0.92}
+
+\lstdefinestyle{mystyle}{
+	backgroundcolor=\color{backcolour},   
+	commentstyle=\color{codegreen},
+	keywordstyle=\color{magenta},
+	numberstyle=\tiny\color{codegray},
+	stringstyle=\color{codepurple},
+	basicstyle=\ttfamily\footnotesize,
+	breakatwhitespace=false,         
+	breaklines=true,                 
+	captionpos=b,                    
+	keepspaces=true,                 
+	numbers=left,                    
+	numbersep=5pt,                  
+	showspaces=false,                
+	showstringspaces=false,
+	showtabs=false,                  
+	tabsize=2
+}
+
+\begin{document}
+	%titulo%
+	\maketitle
+	\newpage
+	
+	\section{Requerimientos del sistema}
+	\hfill \break
+	
+	Se pretende elaborar un sistema para reservar citas dicho sistema es operado por tres roles de usarios (Administrador, Doctor y Paciente). El administrador que es el usuario más abstracto es el encargado de llenar los catalogos fuertes o catálogos principales que son el de (especialidad, medicos, pacientes) pero tambien puede aceptar o rechazar citas de todos los medicos y pacientes ademas puede ver las citas de todos los medicos y pacientes y es capas de cancelarlas si es necesario, las citas tienen tres estados principales que son (reservada, confirmada y cancelada).
+	
+	Ademas el usuario administrador tiene la posibilidad de ver en un grafico la frecuencia de cítas por dia, mes etc y tambien los médicos mas activos.
+	
+	
+	Por otro lado el usuario médico tiene la posiblidad de aceptar, rechazar y cancelar citas, teiendo en cuenta que al cancelar una cita antes de ser confirmada no se pide una explicación, pero al cancelar despues de la cita ser confirmada se tiene que dar una explicación, tambien tiene la posiblidad de mirar sus citas y puede tambien gestionar su horario activando dias e ingresando la hora de inicio y fin del turno mañana y tambien el inicio y fin del turno de la tarde.
+	
+	Mientras que el usuario paciente tiene la posiblidad de solicitar una cita ingresando la especialidad del médico, seleccionando el medico y seleccionando la fecha y hora disponible. Tambien puede ver sus citas y puede cancelar si es necesario.
+	
+	El usuario paciente tambien puede observar sus citas pero no puede hacer modificaciones y puede observar sus citas y status. 
+	
+	
+	\section{Base de datos}
+	\hfill \break
+	
+	\section{Creación del proyecto Laravel}
+	\hfill \break
+	Para crear el proyecto con una versión expecifica existen diferentes comandos y uno es este composer create-project laravel/laravel nombre "5.3"
+	
+	\subsection{Migraciones y autenticación}
+	En el archivo .env es necesario especificar las credenciales de la base de datos que vamos a utilizar, para crear una autenticacion y registroa utomaticos se ingresa el siguiente comando  "php artisan make:auth". Automaticamente nos crea la migración user y tambien la tabla password-reset y tambien nos crea un LoginController y un RegisterController. Para ejecutar las migraciones presionamos "php artisan migrate".
+	
+	\subsection{Integración de la plantilla Argon}
+	Como ya tenemos un login y un registro trabajaremos con ellos solo que les incluiremos un diseño diferenete deacuerdo a la plantilla Argon. utilizamos la directiva @yield en el padre para que tenga una sección modificable, y en la vista hija ponemos @section y @endsection, si ponemos @yield('parametro1','parametro2') estamos diciendo que si no se incluye en el hijo el section entonces ponga por defecto el segundo parametro.
+	Tambien existe la directiva @include('ruta del archivo') es para agregar fragmentos de elementos. Tambien para acceder a un elemento del usuario que ingreso se utiliza  \{\{ auth()$\rightarrow$user()$\rightarrow$name \}\}
+	
+	\subsection{Crear repositorio de Git}
+	(git init) es para iniciar el repositorio y (git add .) sirve para agregar los cambios y finalmente creamos un commit (git commit -m "Base project"). 
+	
+	
+	\section{Gestor de datos (Specialty y User)}
+	Para crear un modelo, una migración y un controlador al mismo tiempo "php artisan make:model Specialty -mc"
+	
+	\lstset{style=mystyle,caption={Código de la migración de Specialty},label=DescriptiveLabel}
+	\begin{lstlisting}
+	public function up()
+	{
+		Schema::create('specialties', function (Blueprint $table) {
+			$table->id();
+			$table->string('name');
+			$table->string('description')->nullable();
+			$table->timestamps();
+		});
+	}
+	\end{lstlisting}  
+
+	Despues se crean las rutas que se utilizaran para crear el CRUD de especialidades.
+	
+	\lstset{style=mystyle,caption={Rutas de Specialty},label=DescriptiveLabel}
+	\begin{lstlisting}
+		Route::get('/specialties','SpecialtyController@index');
+		Route::get('/specialties/create','SpecialtyController@create');
+		Route::get('/specialties/{specialty}/edit','SpecialtyController@edit');
+		Route::post('/specialties', 'SpecialtyController@store');
+		Route::put('/specialties/{specialty}','SpecialtyController@update');
+		Route::delete('/specialties/{specialty}','SpecialtyController@destroy');
+	\end{lstlisting}  
+
+	Cuando queremos llamar una ruta si ya tiene un nombre asignado se pone \{\{ route('home') \}\}, pero si no tiene nombre se manda llamar \{\{ url('specialties/create') \}\}
+	
+	
+	Para crear una especialidad es necesario poner la etiqueta formulario con el action hacia a donde va apuntar y tambien los input con el name especifico y el boton de submit.
+	
+	\lstset{style=mystyle,caption={Formulario Especialidad},label=DescriptiveLabel}
+	\begin{lstlisting}
+		<form action="{{ url('specialties') }}" method="POST">
+		@csrf
+		<div class="form-group">
+		<label for="name">Nombre de la especialidad</label>
+		<input type="text" name="name" class="form-control" value="{{ old('name') }}" required>
+		</div>
+		<div class="form-group">
+		<label for="name">Descripcion</label>
+		<input type="text" name="description" class="form-control">
+		</div>
+		
+		<button type="submit" class="btn btn-primary">Guardar</button>
+		</form>
+	\end{lstlisting}  
+
+	Como se obsera esté formulario manda llamar el metodo Store() y recibe un request que son los nombres de los input.
+	
+	\lstset{style=mystyle,caption={Metodo para crear especialidad},label=DescriptiveLabel}
+	\begin{lstlisting}
+		public function store(Request $request){
+			//dd($resquest->all());
+			$this->performValidation($request);
+			// si hay un error lo retorna y bloquea el flujo
+			
+			$specialty = new Specialty();
+			$specialty->name = $request->input('name');
+			$specialty->description = $request->input('description');
+			$specialty->save();  // realiza un insert en la tabla specialties
+			
+			$notificacion = 'La especialidad se ha registrado correctamente';
+			return redirect('/specialties')->with(compact('notificacion'));// la variable se va a crear como una variable de sesion
+		}
+	\end{lstlisting} 
+
+	Para listar todas las especialidades en la tabla se manda a llamar el metodo index.
+	
+	\lstset{style=mystyle,caption={obtener toda la lista de especialidades },label=DescriptiveLabel}
+	\begin{lstlisting}
+		public function index(){
+			// obtener el listado de espacialidades
+			$specialties = Specialty::all();
+			return view('specialties.index',compact('specialties'));
+		}
+	\end{lstlisting} 
+
+	para pintar los datos en la tabla es necesario crear un foreach para recorrer el arraeglo.
+	
+	\lstset{style=mystyle,caption={pintar datos en tabla},label=DescriptiveLabel}
+	\begin{lstlisting}
+		 @foreach($specialties as $specialty)
+		<tr>
+		<th scope="row">
+		{{ $specialty->name }}
+		</th>
+		<td>
+		{{ $specialty->description }}
+		</td>
+		<td>
+		
+		<form action="{{ url('specialties/'.$specialty->id) }}" method="POST">
+		@csrf
+		@method('DELETE')
+		<a href="{{ url('specialties/'.$specialty->id.'/edit') }}" class="btn btn-sm btn-primary">Editar</a>
+		<button type="submit" class="btn btn-sm btn-danger">Eliminar</button>
+		</form>
+		</td>
+		</tr>
+		@endforeach
+	\end{lstlisting} 
+	
+	
+	Para realizar una validación es necesario utilizar el objeto validate que ya proporciona Laravel, a continuación se muestra que se requieren tres parametros, el primer parametro son el arreglo de datos, el segundo son las reglas a aplicar y finalmente el tercero son los mensajes que se muestran en caso de que se active un error, tambien se muestra como mostrar los mensajes ya que nos devuelve una variable de sesion.
+	
+		\lstset{style=mystyle,caption={Validaciones del lado servidor},label=DescriptiveLabel}
+	\begin{lstlisting}
+		$rules = [
+		'name' => 'required|min:3'
+		];
+		$messages = [
+		'name.required' => 'Es necesario ingresar el nombre ',
+		'name.min' => 'Como minimo el nombre debe tener 3 caracteres'
+		];
+		$this->validate($request,$rules, $messages); 
+		
+		/****************** MOSTRAR LOS ERRORES *****************/
+		<div class="card-body">
+		@if ($errors->any())
+		<div class="alert alert-danger" role="alert">
+		<ul>
+		@foreach($errors->all() as $error)
+		<li>{{ $error }}</li>
+		@endforeach
+		</ul>
+		</div>
+		@endif
+	\end{lstlisting} 
+
+	
+	\subsection{Actualizar datos de la especialidad}
+	
+	Primero mandamos llamar la ruta del método edit para que nos devuleva la especialidad seleccionada y nos permita pintar los datos en la vsta, se obserav que recibe un parametro de tipo Specialty, si le enviamos el Id el mismo framework se encargara de castear para que sea un objeto Specialty, pero si le decimos que reciba otro tipo de parametro, solo recibiremos un numero.
+	
+	\lstset{style=mystyle,caption={funcion edit},label=DescriptiveLabel}
+	\begin{lstlisting}
+		public function edit(Specialty $specialty){
+			return view('specialties.edit', compact('specialty'));
+		}
+	
+		
+		/************************** MOSTRAR LOS DATOS DE LA ESPECIALIDAD ******************/
+		<form action="{{ url('specialties/'.$specialty->id ) }}" method="POST">
+		@csrf
+		@method('PUT')
+		<div class="form-group">
+		<label for="name">Nombre de la especialidad</label>
+		<input type="text" name="name" class="form-control" value="{{ old('name',$specialty->name ) }}" required>
+		</div>
+		<div class="form-group">
+		<label for="name">Descripcion</label>
+		<input type="text" name="description" class="form-control" value="{{ old('description',$specialty->description ) }}">
+		</div>
+		
+		<button type="submit" class="btn btn-primary">Guardar</button>
+		</form>
+	\end{lstlisting} 
+
+	
+	Despues al presionar el boton de guardar cambios se manda llamar la ruta update que tambien recibe un request en el siguiente código se muestra esté método.
+	
+	\lstset{style=mystyle,caption={funcion update},label=DescriptiveLabel}
+	\begin{lstlisting}
+		 public function update(Request $request, Specialty $specialty){
+			//dd($resquest->all());
+			$this->performValidation($request);
+			
+			$specialty->name = $request->input('name');
+			$specialty->description = $request->input('description');
+			$specialty->save();  // realiza un UPDATE en la tabla specialties
+			$notificacion = 'La especialidad se ha actualizado correctamente';
+			return redirect('/specialties')->with(compact('notificacion'));
+		}
+	\end{lstlisting} 
+
+	Finalmente realizaremos la funcionalidad de eliminar especialidades, utilizando el metodo DELETE se creo un boton que esta dentro de un formulario.
+	
+	\lstset{style=mystyle,caption={funcion update},label=DescriptiveLabel}
+	\begin{lstlisting}
+		<form action="{{ url('specialties/'.$specialty->id) }}" method="POST">
+		@csrf
+		@method('DELETE')
+		<a href="{{ url('specialties/'.$specialty->id.'/edit') }}" class="btn btn-sm btn-primary">Editar</a>
+		<button type="submit" class="btn btn-sm btn-danger">Eliminar</button>
+		</form>
+		
+		/*********************** FUNCION EN EL CONTROLADOR ************************/
+		 public function destroy(Specialty $specialty){
+			$deleteName = $specialty->name;
+			$specialty->delete(); # eliminar una especialidad
+			$notificacion = 'La especialidad '.$deleteName.' se ha eliminado correctamente';
+			return redirect('/specialties')->with(compact('notificacion'));
+		}
+	\end{lstlisting} 
+
+
+	\section{Gestionar datos de usuario (Doctor, Patient, Administrador )}
+	
+	Laravel nos da un modelo usuario por defecto pero es necesario agregar más campos como la dirección, telefono, dni, y el rol, vamos a usar el mismo modelo User y vamos hacer dos scopes para filtrar doctores y pacientes. Primero que nada vamos a crear las rutas cabe mencionar que con un Route::resource('') se crean todos los datos CRUD.
+	
+	\lstset{style=mystyle,caption={Ruta doctor y patients},label=DescriptiveLabel}
+	\begin{lstlisting}
+		// DOCTORS
+		Route::resource('doctors','DoctorController');
+		Route::resource('patients','PatientController');
+	\end{lstlisting} 
+
+	Despues vamos a crear los controladores, en este caso crearemos un controlador con todos los metodos ya incluidos, para esto se teclean los siguientes comandos "php artisan make:controller DoctorController --resources".
+	
+	\subsection{Crear Seeder y factories y faker para ususarios}
+	
+	Laravel nos crea un DataBaseSeeder en la carpeta seeds/DataBaseSeeder y desde aquí se mandan a llamar todos los seeders, para crear un seed se teclea lo siguiente "php artisan make:seeder UsersTableSeeder", tambien laravel ya nos crea por defecto un UserFactory, que es el modelo. Dentro esta factory/UserFactry, nos va a dar los datos de dorma aleatoria.
+	
+	\lstset{style=mystyle,caption={ModelFactory},label=DescriptiveLabel}
+	\begin{lstlisting}
+		$factory->define(User::class, function (Faker $faker) {
+			return [
+			'name' => $faker->name,
+			'email' => $faker->unique()->safeEmail,
+			'email_verified_at' => now(),
+			'password' => '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', // password
+			'remember_token' => Str::random(10),
+			'dni' => $faker->randomNumber(8,true),
+			'address' => $faker->address,
+			'phone' => $faker->e164PhoneNumber,
+			'role' => $faker->randomElement(['doctor','patient'])
+			];
+		});
+		
+		// DDEFINIR ESTADO
+		$factory->state(App\User::class, 'patient', [
+		'role' => 'patient'
+		]);
+		
+		$factory->state(App\User::class, 'doctor', [
+		'role' => 'doctor'
+		]);
+	\end{lstlisting} 
+
+	Despues de crear el modelFactory es necesario llamar ese model desde el seeder para crear usuarios random, dicho archivo esta en seeds/UserTableSeeder.
+	
+	\lstset{style=mystyle,caption={SeederUsuario},label=DescriptiveLabel}
+	\begin{lstlisting}
+	public function run()
+	{
+		User::create([
+		'name' => 'admin',
+		'email' => 'samuellopezrosales101@gmail.com',
+		'password' => bcrypt('Barcelona#123'),
+		'dni' => '12345678',
+		'address' => '',
+		'phone' => '',
+		'role' => 'admin'
+		]);
+		User::create([
+		'name' => 'medico',
+		'email' => 'samy-messi10@hotmail.com',
+		'password' => bcrypt('Barcelona#123'),
+		'dni' => '12345678',
+		'address' => '',
+		'phone' => '',
+		'role' => 'doctor'
+		]);
+		User::create([
+		'name' => 'Paciente',
+		'email' => 'paciente@paciente.com',
+		'password' => bcrypt('Barcelona#123'),
+		'dni' => '12345678',
+		'address' => '',
+		'phone' => '',
+		'role' => 'patient'
+		]);
+		factory(User::class,50)->states('patient')->create();
+	}
+	\end{lstlisting} 
+
+	Para que se ejecute finalmente se manda llamar el seed desde DatabaseSeeder seeds/DataBaseSeeder. finalmente se teclea el siguiete comando "php artisan migrate:refresh --seed", esto va hacer rollback de las migraciones es decir las tablas van a ser eliminadas y se volveran a crear y finalmente se ejecutaran los seeders.
+	
+	\lstset{style=mystyle,caption={Ejecutar Seed},label=DescriptiveLabel}
+	\begin{lstlisting}
+	class DatabaseSeeder extends Seeder
+	{
+		/**
+		* Seed the application's database.
+		*
+		* @return void
+		*/
+		public function run()
+		{
+			$this->call([
+			UserTableSeeder::class,
+			SpecialtiesTableSeeder::class,
+			WorkDaysTableSeeder::class
+			]);
+			
+		}
+	}
+	\end{lstlisting} 
+	
+		
+    Para filtrar los usuarios por rol se manda llamar User::where('role','patient')$\rightarrow$get(), pero tambien se puede hacer un Scope para hacer el filtro y no estar llamando al where(), un Scope se realiza dentro de un modelo en este caso dentro del modelo User.
+    
+    
+    \lstset{style=mystyle,caption={Scope doctors y patients},label=DescriptiveLabel}
+    \begin{lstlisting}
+    	public function scopePatients($query){
+    		return $query->where('role','patient');
+    	}
+    	
+    	public function scopeDoctors($query){
+    		return $query->where('role','doctor');
+    	}
+    
+    /************************* MANDARLO LLAMAR EN EL CONTROLADOR *****************************/
+    
+     public function index()
+    {
+    	$doctors = User::doctors()->get();
+    	return view('doctors.index',compact('doctors'));
+    }
+
+	public function index()
+	{
+		$patients = User::patients()->paginate(10);
+		return view('patients.index',compact('patients'));
+	}
+    \end{lstlisting} 
+
+	
+	Hay una forma de proteger los datos que ingresamos con un only() solo se tomaran encuenta los campos que proporcionamos, pero tambien hay que asignar en el modelo que campos se pueden usar de manera masiva.
+    
+    
+    \lstset{style=mystyle,caption={Crear doctor},label=DescriptiveLabel}
+    \begin{lstlisting}
+    	/************************* ESTO EN EL MODELO ***************************/
+    	
+    	// CAMPOS QUE SE ASIGNAN DE MANERA MASIVA 
+    	protected $fillable = [
+    	'name', 'email', 'password','dni','address','phone','role'
+    	];
+    	// CAMPOS QUE ESTAN OCULTOS Y NO SE PUEDEN CONSULTAR //
+    	protected $hidden = [
+    	'password', 'remember_token','pivot'
+    	];
+    	
+    	/*************************CONTROLADOR CREAR MEDICO *****************/
+    	public function store(Request $request)
+    	{
+    		$rules = [
+    		'name' => 'required|min:3',
+    		'email' => 'required|email',
+    		'dni' => 'nullable|digits:8',
+    		'address' => 'nullable|min:5',
+    		'phone' => 'nullable|min:6'
+    		];
+    		$this->validate($request,$rules);
+    		
+    		$user = User::create(
+    		$request->only('name','email','dni','address','phone')
+    		+ [
+    		'role' => 'doctor',
+    		'password' => bcrypt($request->input('password'))
+    		]
+    		);
+    	}
+    
+    	
+    	
+    	$notificacion = 'El Medico se ha registrado correctamnete.';
+    	return redirect('/doctors')->with(compact('notificacion'));
+    \end{lstlisting} 
+
+	Tambien se puede mandar a llamar un medico buscandolo en el controlador solo se pasara su id y con la funcion find() se busca.
+	
+	\lstset{style=mystyle,caption={Buscar doctor},label=DescriptiveLabel}
+	\begin{lstlisting}
+		public function edit($id)
+		{
+			$doctor = User::doctors()->findOrFail($id);
+			return view('doctors.edit',compact('doctor'));
+		}
+	\end{lstlisting} 
+
+	La contraseña no simpre será modificada por eso si existe un valor de l campo password se agregara al data y si no se quedara vacio, con el metodo fill vamos agregar nueva información. 
+	
+	\lstset{style=mystyle,caption={Actualizar Medico},label=DescriptiveLabel}
+	\begin{lstlisting}
+		 public function update(Request $request, $id)
+		{
+			$rules = [
+			'name' => 'required|min:3',
+			'email' => 'required|email',
+			'dni' => 'nullable|digits:8',
+			'address' => 'nullable|min:5',
+			'phone' => 'nullable|min:6'
+			];
+			$this->validate($request,$rules);
+			
+			$user = User::doctors()->findOrFail($id); // busco el objeto
+			$data = $request->only('name','email','dni','address','phone');
+			$password = $request->input('password');
+			if($password)
+			$data['password'] = bcrypt($password);
+			
+			$user->fill($data);
+			$user->save();
+			
+			$user->specialties()->sync($request->input('specialties'));
+			
+			$notificacion = 'El Medico se ha actualizado correctamnete.';
+			return redirect('/doctors')->with(compact('notificacion'));
+		}
+		
+	\end{lstlisting} 
+
+
+	Que diferencia hay entre un médico y un paciente el médico esta asociado a especialidades, y son los que gestionan el horario, y el paciente es quien ve los horarios de los médicos.
+	
+	
+	\section{Proteger rutas usando Middlewares}
+	
+	Laravel ya define por nosotros el middleware de autenticación, para nosotros crear un middleware tecleamos el siguiente comando "php artisan make:middleware AdminMiddleware", si el usuario tiene rol admin le permitiremos continuar, pero si no vamos a redirigir al usuario hacia la ruta de inicio. En este caso haremos una agrupación de rutas y aplicar distintos middlewares.
+	
+	\lstset{style=mystyle,caption={Middleware Rol Admin},label=DescriptiveLabel}
+	\begin{lstlisting}
+		public function handle($request, Closure $next)
+		{
+			if(auth()->user()->role == 'admin')
+			return $next($request);
+			return redirect('/');
+		}
+	
+	
+		/******************** EJECUTAR MIDDLEWARE GRUPO DE RUTAS ***************/
+		Route::middleware(['auth','admin'])->namespace('Admin')->group(function(){
+			Route::get('/specialties','SpecialtyController@index');
+			Route::get('/specialties/create','SpecialtyController@create');
+			Route::get('/specialties/{specialty}/edit','SpecialtyController@edit');
+			
+			Route::post('/specialties', 'SpecialtyController@store');
+			Route::put('/specialties/{specialty}','SpecialtyController@update');
+			Route::delete('/specialties/{specialty}','SpecialtyController@destroy');
+			
+			
+			// DOCTROS
+			Route::resource('doctors','DoctorController');
+			Route::resource('patients','PatientController');
+			
+			Route::get('/charts/appointments/line','ChartController@appointments');
+			Route::get('/charts/doctors/bar','ChartController@doctors');
+		});
+		
+	\end{lstlisting}
+
+	Pero antes tenemos que registrar el middleware app/http/kernel.php.
+	
+	\lstset{style=mystyle,caption={Registrar middleware en kernel},label=DescriptiveLabel}
+	\begin{lstlisting}
+		protected $routeMiddleware = [
+		'auth' => \App\Http\Middleware\Authenticate::class,
+		'auth.basic' => \Illuminate\Auth\Middleware\AuthenticateWithBasicAuth::class,
+		'bindings' => \Illuminate\Routing\Middleware\SubstituteBindings::class,
+		'cache.headers' => \Illuminate\Http\Middleware\SetCacheHeaders::class,
+		'can' => \Illuminate\Auth\Middleware\Authorize::class,
+		'guest' => \App\Http\Middleware\RedirectIfAuthenticated::class,
+		'password.confirm' => \Illuminate\Auth\Middleware\RequirePassword::class,
+		'signed' => \Illuminate\Routing\Middleware\ValidateSignature::class,
+		'throttle' => \Illuminate\Routing\Middleware\ThrottleRequests::class,
+		'verified' => \Illuminate\Auth\Middleware\EnsureEmailIsVerified::class,
+		'admin' => \App\Http\Middleware\AdminMiddleware::class,
+		'doctor' => \App\Http\Middleware\DoctorMiddleware::class,
+		];
+	\end{lstlisting}
+	
+
+	\section{Gestionar Horarios de los médicos}
+	
+	Primero que nada debemos crear un controlador para el horario llamado ScheduleController, "php artisan make:controller Doctor \ ScheduleController ", y tambien vamos a definir las rutas para este Controlador.
+	
+	\lstset{style=mystyle,caption={ScheduleController edit},label=DescriptiveLabel}
+	\begin{lstlisting}
+	/************* DEFINIR RUTAS *********/
+	
+	Route::middleware(['auth','doctor'])->namespace('Doctor')->group(function(){
+		Route::get('/schedule','ScheduleController@edit');
+		Route::post('/schedule','ScheduleController@store');
+	});
+
+	\end{lstlisting}
+
+
+	Tambien vamos a crear una tabla llamada workDays que contiene los campos (id, day(int 0-6), active(boolean), morning-start, morning-end, afternoon-start, afternoon-end, user-id).
+	
+	\lstset{style=mystyle,caption={ScheduleController edit},label=DescriptiveLabel}
+	\begin{lstlisting}
+		public function up()
+		{
+			Schema::create('work_days', function (Blueprint $table) {
+				$table->id();
+				$table->unsignedSmallInteger('day');
+				$table->boolean('active');
+				
+				$table->time('morning_start');
+				$table->time('morning_end');
+				
+				$table->time('afternoon_start');
+				$table->time('afternoon_end');
+				
+				$table->unsignedBigInteger('user_id');
+				$table->foreign('user_id')->references('id')->on('users');
+				
+				$table->timestamps();
+			});
+		}
+	\end{lstlisting}
+
+	Primero creo un arreglo de los 7 dias ['lunes','martes',.....], pero tambien vamos a buscar los dias de trabajo deacuerdo a ese usuario, mediante el user-id, en caso de tener datos, esos datos los vamos a convertir a objetos Carbon con un formato ya determinado, con la función map se hace eso se cambian las que se tienen y se agregan las nuevas ya formateadas y en caso de no tener horario de trabajo se crean 7 dias. Tambien cabe señalar que utilizamos el metodo in-array que busca un elemento dentro de un array. 
+	
+	\lstset{style=mystyle,caption={ScheduleController edit},label=DescriptiveLabel}
+	\begin{lstlisting}
+		private $days = ['Lunes','Martes','Miercoles','Jueves','Viernes','Sabado','Domingo'];
+		public function edit(){
+			
+			$workDays = WorkDay::where('user_id',auth()->user()->id)->get();
+			// la siguiente funcion me permite recibir arreglo y convertirlo a otro
+			if(count($workDays) > 0){
+				$workDays->map(function($workDay){
+					$workDay->morning_start = (new Carbon($workDay->morning_start))->format('g:i A');
+					$workDay->morning_end = (new Carbon($workDay->morning_end))->format('g:i A');
+					$workDay->afternoon_start = (new Carbon($workDay->afternoon_start))->format('g:i A');
+					$workDay->afternoon_end = (new Carbon($workDay->afternoon_end))->format('g:i A');
+					return $workDay;
+				});
+			}else{
+				$workDays = collect();
+				for($i=0; $i<7; $i++)
+				$workDays->push(new WorkDay());
+			}
+			$days = $this->days;
+			return view('schedule',compact('workDays','days'));
+		}
+	
+	
+	
+		/******************* EN LA VISTA SE MUESTRAN ***************/
+		
+		<table class="table align-items-center table-flush">
+		<thead class="thead-light">
+		<tr>
+		<th scope="col">Dias</th>
+		<th scope="col">Activo</th>
+		<th scope="col">Turno Manana</th>
+		<th scope="col">Turno Tarde</th>
+		</tr>
+		</thead>
+		<tbody>
+		@foreach($workDays as $key => $workDay)
+		<tr>
+		<td>{{ $days[$key] }}</td>
+		<td>
+		<label class="custom-toggle">
+		<input type="checkbox" name="active[]" value="{{ $key }}"
+		@if($workDay->active) checked @endif>
+		<span class="custom-toggle-slider rounded-circle"></span>
+		</label>
+		</td>
+		<td>
+		<div class="row">
+		<div class="col">
+		<select class="form-control" name="morning_start[]">
+		@for($i=5; $i<=11; $i++)
+		<option value="{{ ($i<10 ? '0' : '') . $i }}:00" @if($i.':00 AM' == $workDay->morning_start) selected @endif>{{ $i }}:00 AM</option>
+		<option value="{{ ($i<10 ? '0' : '') . $i }}:30" @if($i.':30 AM' == $workDay->morning_start) selected @endif>{{ $i }}:30 AM</option>
+		@endfor
+		</select>
+		</div>
+		<div class="col">
+		<select class="form-control" name="morning_end[]">
+		@for($i=5; $i<=11; $i++)
+		<option value="{{ ($i<10 ? '0' : '') . $i }}:00" @if($i.':00 AM' == $workDay->morning_end) selected @endif>{{ $i }}:00 AM</option>
+		<option value="{{ ($i<10 ? '0' : '') . $i }}:30" @if($i.':30 AM' == $workDay->morning_end) selected @endif>{{ $i }}:30 AM</option>
+		@endfor
+		</select>
+		</div>
+		</div>
+		</td>
+		<td>
+		<div class="row">
+		<div class="col">
+		<select class="form-control" name="afternoon_start[]">
+		@for($i=1; $i<11; $i++)
+		<option value="{{ $i+12 }}:00" @if($i.':00 PM' == $workDay->afternoon_start) selected @endif>{{ $i }}:00 pm</option>
+		<option value="{{ $i+12 }}:30" @if($i.':30 PM' == $workDay->afternoon_start) selected @endif>{{ $i }}:30 pm</option>
+		@endfor
+		</select>
+		</div>
+		<div class="col">
+		<select class="form-control" name="afternoon_end[]">
+		@for($i=1; $i<11; $i++)
+		<option value="{{ $i+12 }}:00" @if($i.':00 PM' == $workDay->afternoon_end) selected @endif>{{ $i }}:00 pm</option>
+		<option value="{{ $i+12 }}:30" @if($i.':30 PM' == $workDay->afternoon_end) selected @endif>{{ $i }}:30 pm</option>
+		@endfor
+		</select>
+		</div>
+		</div>
+		</td>
+		</tr>
+		@endforeach
+		</tbody>
+		</table>
+	\end{lstlisting}
+	
+	Toda la tabla se metio dentro de un form que apunta a la ruta post('schedule'), tambien se observa que el name=morning-start[] son arreglos y llegarian a al metodo store puros arreglos.
+	, tambien hay que verificar si es la primera vez que el médico va ingresar su horario tenemos que hacer una operación insert, pero si ya tiene un horario hay que actualizar, para eso utilizamos el método updateOrCreate(), esté método recibe dos arreglos el primero son los datos a buscar, si no estan esos datos creo un regsitro con los datos del segundo arreglo y si si estan solo actaliza con los datos del segundo arreglo. Tambien se realiza una validación de la consistencia de las horas vemos si las horas de inicio son mayores a las horas de fin entonces se manda una alerta.
+	
+	\lstset{style=mystyle,caption={ScheduleController store(guardar horario)},label=DescriptiveLabel}
+	\begin{lstlisting}
+		 public function store(Request $request){
+			//dd($request->all());
+			//die();
+			$active = $request->input('active') ?: []; // si no vienen elementos  asigna un array vacio
+			$morning_start = $request->input('morning_start');
+			$morning_end = $request->input('morning_end');
+			$afternoon_start = $request->input('afternoon_start');
+			$afternoon_end = $request->input('afternoon_end');
+			
+			$errors = [];
+			for($i=0; $i<7; $i++){
+				if($morning_start[$i] > $morning_end[$i]){
+					$errors [] = "Las horas del turno de la manana son incosistentes para el dia " . $this->days[$i] . " .";
+				}
+				
+				if($afternoon_start[$i] > $afternoon_end[$i]){
+					$errors [] = "Las horas del turno de la tarde son incosistentes para el dia ". $this->days[$i]. " .";
+				}
+				WorkDay::updateOrCreate(
+				['day' => $i, // son elementos que hay que buscar para ver si ya estan
+				'user_id' => auth()->id()],
+				[
+				'active' => in_array($i, $active), // si esta el elemento retorna 1 y si no un cero
+				'morning_start' => $morning_start[$i],
+				'morning_end' => $morning_end[$i],
+				'afternoon_start' => $afternoon_start[$i],
+				'afternoon_end' => $afternoon_end[$i]
+				
+				]
+				);
+			}
+			
+			if(count($errors) > 0)
+			return back()->with(compact('errors'));
+			
+			$notificacion = 'Los cambios se han guardado correctamente.';
+			return back()->with(compact('notificacion'));
+			
+		}	
+	\end{lstlisting}
+	
+	
+	
+	\section{Registrar cita versión web(paciente)}
+
+	Para registrar una cita fue necesesario crear una tabla para citas llamadas appointments, se teclea el siguiente comando para crear una migracion, controlador y modelo "php artisan make:model Appointment -mc". pero tambien tenemos que registrar una ruta para mandarlos llamar.
+	
+	
+	\lstset{style=mystyle,caption={ruta,migracion, migracion y controlador cita},label=DescriptiveLabel}
+	\begin{lstlisting}
+		/******** RUTAS *************/
+		Route::get('/appointments/create','AppointmentController@create');
+		Route::post('/appointments','AppointmentController@store');
+		
+		/******* MIGRACION **************/
+		public function up()
+		{
+			Schema::create('appointments', function (Blueprint $table) {
+				$table->id();
+				
+				$table->string('description');
+				
+				// fk_ specialty
+				$table->unsignedBigInteger('specialty_id');
+				$table->foreign('specialty_id')->references('id')->on('specialties');
+				
+				// fk_ doctor
+				$table->unsignedBigInteger('doctor_id');
+				$table->foreign('doctor_id')->references('id')->on('users');
+				
+				// fk_ specialty
+				$table->unsignedBigInteger('patient_id');
+				$table->foreign('patient_id')->references('id')->on('users');
+				
+				$table->date('scheduled_date');
+				$table->time('scheduled_time');
+				
+				$table->string('type');
+				
+				
+				
+				$table->timestamps();
+			});
+		}
+	
+	
+		/****** el controlador retorna todas las especialidades *****/
+		public function create(){
+			$specialties = Specialty::all();
+			return view('appointments.create', compact('specialties'));
+		}
+	
+		/************ pinta las especialidades en un select ****/
+		<div class="form-group col-md-6">
+		<label for="name">Especialidad</label>
+		<select name="specialty_id" id="specialty" class="form-control" required>
+		<option value="">Seleccione especialidad</option>
+		@foreach($specialties as $key => $specialty)
+		<option value="{{ $specialty->id }}" @if(old('specialty_id')== $specialty->id)
+		selected @endif>{{ $specialty->name }}</option>
+		@endforeach
+		</select>
+		</div>
+	\end{lstlisting}
+
+	\subsection{Relación muchos a muchos entre médico y especialidad}
+	
+	Un medico puede tener muchas especialidades y una especialidad puede tener muchos médicos por eso es una relación muchos a muchos, ahora es necesario decirselo a laravel mediante el ORM, por dicho motivo se hara una tabla intermedia que contenga el id de la esepcialidad y el id del médico, podemos elegir muchas especialidades con bootstrap select. (Laravel sabe con que tabla estan cada modelo lo que hace es usar el nombre del modelo y le agrega el plural), si no tuviera el mismo nombre tendriamos que indicarle a laravel el nombre de a tabla que queremos usar con protected table = 'nombre de tabla', tambien hay una convención para las lleves foraneas y para tablas intermedias, para definir un atabla intermedia ambos modelos deben tener el nombre de la tabla en singular y se forman de forma alfabetica (specialty-user), va a buscar la tabla y le agrgara un id user-id, specialty-id, para crear esto teclearemos "php artisan make:migration create-specilaty-user-table". Para definir la relación hay que definir 2 metodos uno en el modelo user que se llame specialties y otro en specialty que se llame users. si no hubieramos utilizado la convención hubiermaos tenido que definir en el metodo tambine el nombre de la tabla intermedia y el nombre del identificador.
+	
+	\lstset{style=mystyle,caption={relacion specialty y user},label=DescriptiveLabel}
+	\begin{lstlisting}
+		public function up()
+		{
+			Schema::create('specialty_user', function (Blueprint $table) {
+				$table->id();
+				// doctor
+				$table->unsignedBigInteger('user_id');
+				$table->foreign('user_id')->references('id')->on('users');
+				// especialidad
+				$table->unsignedBigInteger('specialty_id');
+				$table->foreign('specialty_id')->references('id')->on('specialties');
+				
+				$table->timestamps();
+			});
+		}
+	
+		/******** MODELO USER ***************/
+			
+		public function specialties()
+		{
+			return $this->belongsToMany(Specialty::class)->withTimestamps();
+		}
+	
+		/******** MODELO SPECIALTY *********/
+		public function users()
+		{
+			return $this->belongsToMany(User::class)->withTimestamps();
+		}
+	\end{lstlisting}
+	
+	
+	\subsection{Modificación para crear un médico para asignarle las especialidades que requiere}
+	
+	Para seleccionar especilaidades para un médico necesitamos usar el bootstrap-select, que e sun plugin externo, y entoces lo que recibira el strore para crear el médico sera un arreglo de especialidades. Desde el modelo de usuarios tenemos specialties y tambien tenemos el metodo attach que se encarga de crear relaciones y ya solo es necesario pasarle el arreglo de especialidades.
+	
+	\lstset{style=mystyle,caption={Asignar especialidades a un medico},label=DescriptiveLabel}
+	\begin{lstlisting}
+		<div class="form-group">
+		<label for="specialties">Especialidades</label>
+		<select name="specialties[]" id="specialties" class="form-control selectpicker" data-style="btn-default" multiple title="Seleccione una o varias">
+		@foreach($specialties as $specialty)
+		<option value="{{ $specialty->id }}">{{ $specialty->name }}</option>
+		@endforeach
+		</select>
+		</div>
+		
+		
+		/********* METODO PARA CREAR MEDICO****/
+		public function store(Request $request)
+		{
+			$rules = [
+			'name' => 'required|min:3',
+			'email' => 'required|email',
+			'dni' => 'nullable|digits:8',
+			'address' => 'nullable|min:5',
+			'phone' => 'nullable|min:6'
+			];
+			$this->validate($request,$rules);
+			
+			$user = User::create(
+			$request->only('name','email','dni','address','phone')
+			+ [
+			'role' => 'doctor',
+			'password' => bcrypt($request->input('password'))
+			]
+			);
+			// asignar especialidades al medico
+			$user->specialties()->attach($request->input('specialties')); // va a recibir el arreglo de las especilaidadex
+			
+			$notificacion = 'El MEdico se ha registrado correctamnete.';
+			return redirect('/doctors')->with(compact('notificacion'));
+		}
+	\end{lstlisting}
+
+	Para listar los médicos segun la especialidad tenemos varias opciones tales como usar (vue, jquery, javascript), en esté caso utilizaremos jQuery. cuando laravel devuelve una coleccoón la devuelve automaticamente en JSON.
+	
+	\lstset{style=mystyle,caption={Ruta medicos segun la especialidad},label=DescriptiveLabel}
+	\begin{lstlisting}
+		Route::get('/specialties/{specialty}/doctors','Api\SpeicaltyController@doctors');
+		
+		/**** retornar los doctores de esta especialidad ******/
+		
+		public function doctors(Specialty $specialty)
+		{
+			return $specialty->users()->get([
+			'users.id','users.name'
+			]);
+		}
+	\end{lstlisting}
+
+	Cada que exista un cambio en el campo specialty mandaremos llamar la ruta para listar los médicos segun la especialidad para eso utilizamos el método change() y llenamos el otro select con los datos que me trae la ruta.
+	
+	\lstset{style=mystyle,caption={Llenar medicos segun la especialidad},label=DescriptiveLabel}
+	\begin{lstlisting}
+		/*********** HTML MEDICOS ************/
+		
+		<div class="form-row">
+		<div class="form-group col-md-6">
+		<label for="name">Especialidad</label>
+		<select name="specialty_id" id="specialty" class="form-control" required>
+		<option value="">Seleccione especialidad</option>
+		@foreach($specialties as $key => $specialty)
+		<option value="{{ $specialty->id }}" @if(old('specialty_id')== $specialty->id)
+		selected @endif>{{ $specialty->name }}</option>
+		@endforeach
+		</select>
+		</div>
+		<div class="form-group col-md-6">
+		<label for="email">Medico</label>
+		<select name="doctor_id" id="doctor" class="form-control" required>
+		@foreach($doctors as $doctor)
+		<option value="{{ $doctor->id }}" @if(old('doctor_id')== $doctor->id)
+		selected @endif>{{ $doctor->name }}</option>
+		@endforeach
+		</select>
+		</div>
+		</div>
+		
+		/************ JAVASCRIPT PARA LLENAR SELECT ********/
+		$(function() {
+			$specialty = $('#specialty');
+			$doctor = $('#doctor');
+			$date = $('#date');
+			$hours = $('#hours');
+			
+			$specialty.change(() => {
+				const specialtyId = $specialty.val();
+				const url = `/specialties/${specialtyId}/doctors`;
+				$.getJSON(url,onDoctorsLoaded);
+			});
+			
+			$doctor.change(loadHours);
+			$date.change(loadHours);
+		});
+	
+		
+		function onDoctorsLoaded(doctors){
+			let htmlOptions = '';
+			doctors.forEach(doctor => {
+				htmlOptions += `<option value="${doctor.id}">${doctor.name}</option>`;
+			});
+			$doctor.html(htmlOptions);
+			loadHours();
+		}
+	\end{lstlisting}
+	
+	\subsection{Obtener horas por intervalo de 30 minutos segun medico y fecha}
+	
+	Para eso craremos un controlador llamado ScheduleController y vamos a definir una ruta que nos retorne la shoras.
+	
+		\lstset{style=mystyle,caption={Rangos de Horas JSON},label=DescriptiveLabel}
+	\begin{lstlisting}
+		/*********** RUTA ************/
+		
+		Route::get('/schedule/hours','Api\ScheduleController@hours');
+		
+		/**************** METODO HOURS **************/
+		
+		public function hours(Request $request, ScheduleServiceInterface $scheduleService){
+			$rules =[
+			'date'=>'required|date_format:"Y-m-d"',
+			'doctor_id'=>'required|exists:users,id'
+			];
+			$this->validate($request, $rules);
+			
+			$date = $request->input('date');
+			$doctorId = $request->input('doctor_id');
+			
+			
+			return $scheduleService->getAvailableIntervals($date, $doctorId);
+			
+		}
+	
+	
+		/*********** INTERFACE **************************/
+		interface ScheduleServiceInterface
+		{
+			public function isAvailableInterval($date, $doctorId, Carbon $start);
+			public function getAvailableIntervals($date, $doctorId);
+		}
+	
+	
+		/********** SERVICE *****************************/
+		
+		class ScheduleService implements ScheduleServiceInterface
+		{
+			public function isAvailableInterval($date, $doctorId, Carbon $start){
+				$exists = Appointment::where('doctor_id', $doctorId)
+				->where('scheduled_date', $date)
+				->where('scheduled_time', $start->format('H:i:s'))
+				->exists();
+				return !$exists;
+			}
+			public function getDayFromDate($date)
+			{
+				$dateCarbon= new Carbon($date);
+				
+				$i = $dateCarbon->dayOfWeek;
+				$day = ($i==0 ? 6 :$i-1);
+				return $day;
+			}
+			public function getAvailableIntervals($date, $doctorId)
+			{
+				$workDay = WorkDay::where('active', true)
+				->where('day', $this->getDayFromDate($date))
+				->where('user_id', $doctorId)
+				->first([
+				'morning_start', 'morning_end',
+				'afternoon_start', 'afternoon_end'
+				]);
+				if(!$workDay){
+					return [];
+				}
+				$morningIntervals = $this->getIntervals(
+				$workDay->morning_start, $workDay->morning_end, $date, $doctorId);
+				$afternoonIntervals = $this->getIntervals(
+				$workDay->afternoon_start, $workDay->afternoon_end
+				,$date, $doctorId
+				);
+				$data = [];
+				$data['morning']= $morningIntervals;
+				$data['afternoon']= $afternoonIntervals;
+				return $data;
+			}
+			
+			private function getIntervals($start, $end, $date, $doctorId){
+				$start = new Carbon($start);
+				$end = new Carbon($end);
+				
+				$intervals = [];
+				while($start < $end){
+					$interval = [];
+					
+					$interval['start'] = $start->format('g:i A');
+					
+					// no existe una cita para esta hora con este medico
+					$available = $this->isAvailableInterval($date, $doctorId, $start);
+					
+					$start->addMinutes(30);
+					$interval['end'] = $start->format('g:i A');
+					
+					if($available){
+						$intervals [] = $interval;
+					}
+				}
+				return $intervals;
+			}
+		}
+	\end{lstlisting}
+	
+	
+	La ruta previamente propuesta la vamos a mandar llamar cada que exista un cambio ya sea en el campo medico o en el campo schedule-date y entonces pintaremos los intervalos.
+	
+	\lstset{style=mystyle,caption={Llamar ruta de intervalos de horas},label=DescriptiveLabel}
+	\begin{lstlisting}
+		function loadHours(){
+			const selectedDate = $date.val();
+			const doctorId = $doctor.val();
+			const url = `/schedule/hours?date=${selectedDate}&doctor_id=${doctorId}`;
+			$.getJSON(url, displayHours);
+		}
+		
+		function displayHours(data){
+			if(!data.morning && !data.afternoon){
+				console.log("No se encontraron horas para el medico ese dia ");
+				$hours.html(noHoursAlert);
+				return;
+			}
+	
+	\end{lstlisting}
+
+	Con las siguientes funciones retornamos los intervalos.
+	
+	\lstset{style=mystyle,caption={Retornar los intervalos},label=DescriptiveLabel}
+	\begin{lstlisting}
+		private function getIntervals($start, $end, $date, $doctorId){
+			$start = new Carbon($start);
+			$end = new Carbon($end);
+			
+			$intervals = [];
+			while($start < $end){
+				$interval = [];
+				
+				$interval['start'] = $start->format('g:i A');
+				
+				// no existe una cita para esta hora con este medico
+				$available = $this->isAvailableInterval($date, $doctorId, $start);
+				
+				$start->addMinutes(30);
+				$interval['end'] = $start->format('g:i A');
+				
+				if($available){
+					$intervals [] = $interval;
+				}
+			}
+			return $intervals;
+		}
+	
+	
+	
+	   public function getAvailableIntervals($date, $doctorId)
+	   {
+	   	$workDay = WorkDay::where('active', true)
+	   	->where('day', $this->getDayFromDate($date))
+	   	->where('user_id', $doctorId)
+	   	->first([
+	   	'morning_start', 'morning_end',
+	   	'afternoon_start', 'afternoon_end'
+	   	]);
+	   	if(!$workDay){
+	   		return [];
+	   	}
+	   	$morningIntervals = $this->getIntervals(
+	   	$workDay->morning_start, $workDay->morning_end, $date, $doctorId);
+	   	$afternoonIntervals = $this->getIntervals(
+	   	$workDay->afternoon_start, $workDay->afternoon_end
+	   	,$date, $doctorId
+	   	);
+	   	$data = [];
+	   	$data['morning']= $morningIntervals;
+	   	$data['afternoon']= $afternoonIntervals;
+	   	return $data;
+	   }
+	\end{lstlisting}
+
+
+	\newpage
+	\section{Desarrollo de la aplicación móvil}
+	\hfill \break
+	
+	Al crear el proyecto no configura la pantalla principal activity-main y el main.java
+	
+	\subsection{Diseño de Loging}
+	\hfill \break
+	
+	Como la vista es muy simple se va utilizar un LinerarLayout vertical para que nos coloque un elemento encima de otro. los atributos wrap-content significa que esta asociado al contendo y match-parent es que utilize el acho o alto total, tendremos un textView con el texto Inicio de sesion, despues dos texView con E-mail y contraseña, dos campos EditText para llenar, un boton para registra y finalmente un textView con un click asociado. la medidia que se usa en android no son px sino dp, pero para los textos se usa sp, puedo repartir pesos con weight.
+	
+	\lstset{style=mystyle,caption={Pantalla Login},label=DescriptiveLabel}
+	\begin{lstlisting}
+		<?xml version="1.0" encoding="utf-8"?>
+		<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+		xmlns:app="http://schemas.android.com/apk/res-auto"
+		xmlns:tools="http://schemas.android.com/tools"
+		android:layout_width="match_parent"
+		android:layout_height="match_parent"
+		android:orientation="vertical"
+		android:padding="8dp"
+		android:background="@drawable/backgroundsss"
+		tools:context=".MainActivity">
+		
+		<TextView
+		android:layout_width="match_parent"
+		android:layout_height="0dp"
+		android:layout_weight="1"
+		android:textSize="30sp"
+		android:background="@color/transparent"
+		android:gravity="center_horizontal"
+		android:text="@string/label_login"
+		android:textColor="@color/letras"
+		android:textAppearance="@style/Base.TextAppearance.AppCompat.Medium" />
+		
+		<LinearLayout
+		android:layout_width="match_parent"
+		android:layout_height="wrap_content"
+		android:background="@color/transparent"
+		android:padding="8dp"
+		android:orientation="vertical">
+		
+		<TextView
+		android:layout_width="match_parent"
+		android:layout_height="wrap_content"
+		android:gravity="center_horizontal"
+		android:layout_marginTop="12dp"
+		android:textSize="20sp"
+		android:textColor="@color/letras"
+		android:text="@string/label_email" />
+		
+		<EditText
+		android:inputType="textEmailAddress"
+		android:layout_width="match_parent"
+		android:layout_height="wrap_content"
+		android:layout_marginTop="12dp"
+		android:textColor="@color/letras"/>
+		
+		<TextView
+		android:layout_width="match_parent"
+		android:layout_height="wrap_content"
+		android:layout_marginTop="12dp"
+		android:gravity="center_horizontal"
+		android:textColor="@color/letras"
+		android:textSize="20sp"
+		android:text="@string/label_password" />
+		
+		<EditText
+		android:inputType="textPassword"
+		android:layout_width="match_parent"
+		android:layout_height="wrap_content"
+		android:layout_marginTop="12dp"
+		android:textColor="@color/letras"/>
+		
+		
+		<Button
+		android:layout_width="match_parent"
+		android:layout_height="wrap_content"
+		android:layout_marginTop="12dp"
+		android:text="@string/buton_login"
+		style="@style/Base.Widget.AppCompat.Button.Colored"/>
+		
+		<TextView
+		android:layout_width="match_parent"
+		android:layout_height="wrap_content"
+		android:layout_marginTop="12dp"
+		android:layout_marginBottom="16dp"
+		android:gravity="center_horizontal"
+		android:textColor="@color/letras"
+		android:text="@string/go_to_registrer" />
+		
+		</LinearLayout>
+		
+		
+		</LinearLayout>
+	\end{lstlisting}
+	
+	
+	
+	\subsection{Diseño del Registro}
+	
+	\lstset{style=mystyle,caption={Pantalla de Registro},label=DescriptiveLabel}
+	\begin{lstlisting}
+		<?xml version="1.0" encoding="utf-8"?>
+		<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+		xmlns:app="http://schemas.android.com/apk/res-auto"
+		xmlns:tools="http://schemas.android.com/tools"
+		android:layout_width="match_parent"
+		android:layout_height="match_parent"
+		android:orientation="vertical"
+		tools:context=".MainActivity">
+		
+		<TextView
+		android:paddingTop="12dp"
+		android:layout_width="match_parent"
+		android:layout_height="0dp"
+		android:layout_weight="1"
+		android:textSize="30sp"
+		android:background="@drawable/bg_gradient"
+		android:gravity="center_horizontal"
+		android:text="@string/label_regis"
+		android:textColor="@color/white"
+		android:textAppearance="@style/Base.TextAppearance.AppCompat.Medium" />
+		
+		<LinearLayout
+		android:layout_width="match_parent"
+		android:layout_height="wrap_content"
+		android:background="@color/colorPrimaryDark"
+		android:padding="8dp"
+		android:orientation="vertical">
+		
+		<TextView
+		android:layout_width="match_parent"
+		android:layout_height="wrap_content"
+		android:gravity="center_horizontal"
+		android:layout_marginTop="12dp"
+		android:textSize="20sp"
+		android:textColor="@color/white"
+		android:text="@string/label_name" />
+		
+		<EditText
+		android:inputType="textEmailAddress"
+		android:layout_width="match_parent"
+		android:layout_height="wrap_content"
+		android:layout_marginTop="12dp"
+		android:textColor="@color/white"/>
+		
+		<TextView
+		android:layout_width="match_parent"
+		android:layout_height="wrap_content"
+		android:gravity="center_horizontal"
+		android:layout_marginTop="12dp"
+		android:textSize="20sp"
+		android:textColor="@color/white"
+		android:text="@string/label_email" />
+		
+		<EditText
+		android:inputType="textEmailAddress"
+		android:layout_width="match_parent"
+		android:layout_height="wrap_content"
+		android:layout_marginTop="12dp"
+		android:textColor="@color/white"/>
+		
+		<TextView
+		android:layout_width="match_parent"
+		android:layout_height="wrap_content"
+		android:layout_marginTop="12dp"
+		android:gravity="center_horizontal"
+		android:textColor="@color/white"
+		android:textSize="20sp"
+		android:text="@string/label_password" />
+		
+		<EditText
+		android:inputType="textPassword"
+		android:layout_width="match_parent"
+		android:layout_height="wrap_content"
+		android:layout_marginTop="12dp"
+		android:textColor="@color/white"/>
+		
+		
+		<Button
+		android:layout_width="match_parent"
+		android:layout_height="wrap_content"
+		android:layout_marginTop="12dp"
+		android:text="@string/buton_register"
+		style="@style/Base.Widget.AppCompat.Button.Colored"/>
+		
+		<TextView
+		android:layout_width="match_parent"
+		android:layout_height="wrap_content"
+		android:layout_marginTop="12dp"
+		android:layout_marginBottom="16dp"
+		android:gravity="center_horizontal"
+		android:textColor="@color/white"
+		android:text="@string/go_to_login" />
+		
+		</LinearLayout>
+		
+		
+		</LinearLayout>
+	\end{lstlisting}
+
+	En Kotlin es muy sencillo ya no hay que hacer referencia a los id sino que podemos utilizarlos directament, por ejemplo si presionamos al id correspondiente podemos mandar llamar un TOAST.
+	
+	\lstset{style=mystyle,caption={Toast con Kotlin},label=DescriptiveLabel}
+	\begin{lstlisting}
+		import android.os.Bundle
+		import android.view.View
+		import android.widget.TextView
+		import android.widget.Toast
+		import kotlinx.android.synthetic.main.activity_main.*
+		
+		class MainActivity : AppCompatActivity() {
+			
+			override fun onCreate(savedInstanceState: Bundle?) {
+				super.onCreate(savedInstanceState)
+				setContentView(R.layout.activity_main)
+				
+				tvGoToRegister.setOnClickListener {
+					Toast.makeText(this, "Hola soy un Toast", Toast.LENGTH_SHORT)
+				}
+				
+				
+			}
+		}
+	\end{lstlisting}
+	
+	
+	Para abrir otro activity desde uno se usa el metodo Intetn y starIntent 
+	
+	\lstset{style=mystyle,caption={Intent entre pantallas},label=DescriptiveLabel}
+	\begin{lstlisting}
+	import android.os.Bundle
+	import android.view.View
+	import android.widget.TextView
+	import android.widget.Toast
+	import kotlinx.android.synthetic.main.activity_main.*
+	
+	class MainActivity : AppCompatActivity() {
+		
+		override fun onCreate(savedInstanceState: Bundle?) {
+			super.onCreate(savedInstanceState)
+			setContentView(R.layout.activity_main)
+			
+			tvGoToRegister.setOnClickListener {
+				Toast.makeText(this, getString(R.string.please_fill_your_data), Toast.LENGTH_SHORT)
+				
+				// si usamos var la variable puede cambiar pero si usamos val no cambiara
+				// para no tener error tenemos que poner .java al final porque intent es una clase java
+				val intent = Intent(this, RegisterActivity::class.java)
+				startActivity(intent)
+			}
+			
+			
+		}
+	}
+	
+	
+	
+	\end{lstlisting}
+
+	\subsection{Diseño del Menú de opciones}
+	
+	La aplicación móvil tiene 3 opciones la primera es para crear una cíta, la segunda es para ver las citas y sus status y la tercera es para cerrar sessión.
+	
+	\lstset{style=mystyle,caption={Diseño Menú de opciones},label=DescriptiveLabel}
+	\begin{lstlisting}
+		<?xml version="1.0" encoding="utf-8"?>
+		<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+		xmlns:app="http://schemas.android.com/apk/res-auto"
+		xmlns:tools="http://schemas.android.com/tools"
+		android:layout_width="match_parent"
+		android:layout_height="match_parent"
+		android:orientation="vertical"
+		android:gravity="center"
+		android:padding="16dp"
+		android:background="@drawable/bg_gradient"
+		tools:context=".MenuActivity">
+		
+		<TextView
+		android:paddingTop="12dp"
+		android:layout_width="match_parent"
+		android:layout_height="60dp"
+		android:textSize="30sp"
+		android:gravity="center_horizontal"
+		android:text="@string/option_menu"
+		android:textColor="@color/white"
+		android:textAppearance="@style/Base.TextAppearance.AppCompat.Medium" />
+		
+		
+		
+		
+		<Button
+		android:layout_width="match_parent"
+		android:layout_marginTop="12dp"
+		android:drawableStart="@drawable/ic_add_circle"
+		android:text="@string/create_appointment"
+		style="@style/menuButton"/>
+		
+		<Button
+		android:layout_width="match_parent"
+		android:layout_marginTop="12dp"
+		android:drawableStart="@drawable/ic_schedule"
+		android:text="@string/my_appointment"
+		style="@style/menuButton"/>
+		
+		<Button
+		android:layout_width="match_parent"
+		android:layout_marginTop="12dp"
+		android:layout_marginBottom="16dp"
+		android:drawableStart="@drawable/ic_power_off"
+		android:text="@string/logout"
+		style="@style/menuButton"/>
+		
+		</LinearLayout>
+	\end{lstlisting}
+		
+	
+	
+	
+	\subsection{Diseño crear cita}
+	
+	Primero vamos a solicitar la especialidad del médico, un comentario, el tipo de cita, el médico y la fecha. primero tendremos un cardview visible y al presionar next lo haremos invisible y mostraremos el otro.
+	
+	\lstset{style=mystyle,caption={Diseño primer paso reservar cita},label=DescriptiveLabel}
+	\begin{lstlisting}
+		<?xml version="1.0" encoding="utf-8"?>
+		<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+		xmlns:app="http://schemas.android.com/apk/res-auto"
+		xmlns:tools="http://schemas.android.com/tools"
+		android:layout_width="match_parent"
+		android:layout_height="match_parent"
+		android:background="@drawable/bg_gradient"
+		android:gravity="center"
+		android:orientation="vertical"
+		android:padding="16dp"
+		tools:context=".CreateAppointmentActivity">
+		
+		<TextView
+		android:layout_width="match_parent"
+		android:layout_height="60dp"
+		android:gravity="center_horizontal"
+		android:paddingTop="12dp"
+		android:text="@string/create_appointment"
+		android:textAppearance="@style/Base.TextAppearance.AppCompat.Medium"
+		android:textColor="@color/white"
+		android:textSize="30sp" />
+		
+		<android.support.v7.widget.CardView
+		android:id="@+id/cvStep1"
+		android:layout_width="match_parent"
+		android:layout_height="wrap_content"
+		app:cardCornerRadius="8dp"
+		app:cardElevation="8dp"
+		app:contentPadding="12dp">
+		
+		<LinearLayout
+		android:layout_width="match_parent"
+		android:layout_height="match_parent"
+		android:orientation="vertical">
+		
+		<TextView
+		android:layout_width="match_parent"
+		android:layout_height="wrap_content"
+		android:layout_marginTop="8dp"
+		android:gravity="center_horizontal"
+		android:text="@string/label_descripcion"
+		android:textColor="@color/letras" />
+		
+		<EditText
+		android:layout_width="match_parent"
+		android:layout_height="wrap_content"
+		android:textColor="@color/letras" />
+		
+		<TextView
+		android:layout_width="match_parent"
+		android:layout_height="wrap_content"
+		android:layout_marginTop="8dp"
+		android:gravity="center_horizontal"
+		android:text="@string/label_specialty"
+		android:textColor="@color/letras" />
+		
+		<Spinner
+		android:layout_width="match_parent"
+		android:layout_height="wrap_content"></Spinner>
+		
+		<TextView
+		android:layout_width="match_parent"
+		android:layout_height="wrap_content"
+		android:layout_marginTop="8dp"
+		android:gravity="center_horizontal"
+		android:text="@string/label_tipo_cita"
+		android:textColor="@color/letras" />
+		
+		<RadioGroup
+		android:layout_width="match_parent"
+		android:layout_height="wrap_content"
+		android:layout_marginBottom="8dp"
+		android:orientation="vertical">
+		
+		<RadioButton
+		android:layout_width="wrap_content"
+		android:layout_height="wrap_content"
+		android:text="@string/tipo1"
+		android:textColor="@color/letras" />
+		
+		<RadioButton
+		android:layout_width="wrap_content"
+		android:layout_height="wrap_content"
+		android:text="@string/tipo2"
+		android:textColor="@color/letras" />
+		
+		<RadioButton
+		android:layout_width="wrap_content"
+		android:layout_height="wrap_content"
+		android:text="@string/tipo3"
+		android:textColor="@color/letras" />
+		
+		</RadioGroup>
+		
+		<Button
+		android:id="@+id/btnNext"
+		style="@style/menuButton"
+		android:layout_width="match_parent"
+		android:layout_marginTop="12dp"
+		android:layout_marginBottom="16dp"
+		android:drawableEnd="@drawable/ic_navigate_next"
+		android:text="@string/btn_next" />
+		
+		</LinearLayout>
+		
+		</android.support.v7.widget.CardView>
+		
+		
+		<android.support.v7.widget.CardView
+		android:id="@+id/cvStep2"
+		android:layout_width="match_parent"
+		android:layout_height="wrap_content"
+		android:visibility="gone"
+		app:cardCornerRadius="8dp"
+		app:cardElevation="8dp"
+		app:contentPadding="12dp">
+		
+		<android.support.v4.widget.NestedScrollView
+		android:layout_width="match_parent"
+		android:layout_height="wrap_content">
+		
+		<LinearLayout
+		android:layout_width="match_parent"
+		android:layout_height="match_parent"
+		android:orientation="vertical">
+		
+		<TextView
+		android:layout_width="match_parent"
+		android:layout_height="wrap_content"
+		android:layout_marginTop="8dp"
+		android:gravity="center_horizontal"
+		android:text="@string/label_doctor"
+		android:textColor="@color/letras" />
+		
+		<Spinner
+		android:layout_width="match_parent"
+		android:layout_height="wrap_content"></Spinner>
+		
+		<TextView
+		android:layout_width="match_parent"
+		android:layout_height="wrap_content"
+		android:layout_marginTop="8dp"
+		android:gravity="center_horizontal"
+		android:text="@string/label_schedule_date"
+		android:textColor="@color/letras" />
+		
+		<EditText
+		android:layout_width="match_parent"
+		android:layout_height="wrap_content"
+		android:textColor="@color/letras" />
+		
+		<RadioGroup
+		android:layout_width="match_parent"
+		android:layout_height="wrap_content"
+		android:layout_marginBottom="8dp"
+		android:orientation="vertical">
+		
+		<RadioButton
+		android:layout_width="wrap_content"
+		android:layout_height="wrap_content"
+		android:text="8:00 AM"
+		android:textColor="@color/letras" />
+		
+		<RadioButton
+		android:layout_width="wrap_content"
+		android:layout_height="wrap_content"
+		android:text="8:30 AM"
+		android:textColor="@color/letras" />
+		
+		<RadioButton
+		android:layout_width="wrap_content"
+		android:layout_height="wrap_content"
+		android:text="9:00 AM"
+		android:textColor="@color/letras" />
+		
+		<RadioButton
+		android:layout_width="wrap_content"
+		android:layout_height="wrap_content"
+		android:text="8:00 AM"
+		android:textColor="@color/letras" />
+		
+		<RadioButton
+		android:layout_width="wrap_content"
+		android:layout_height="wrap_content"
+		android:text="8:30 AM"
+		android:textColor="@color/letras" />
+		
+		<RadioButton
+		android:layout_width="wrap_content"
+		android:layout_height="wrap_content"
+		android:text="9:00 AM"
+		android:textColor="@color/letras" />
+		
+		<RadioButton
+		android:layout_width="wrap_content"
+		android:layout_height="wrap_content"
+		android:text="8:00 AM"
+		android:textColor="@color/letras" />
+		
+		<RadioButton
+		android:layout_width="wrap_content"
+		android:layout_height="wrap_content"
+		android:text="8:30 AM"
+		android:textColor="@color/letras" />
+		
+		<RadioButton
+		android:layout_width="wrap_content"
+		android:layout_height="wrap_content"
+		android:text="9:00 AM"
+		android:textColor="@color/letras" />
+		
+		<RadioButton
+		android:layout_width="wrap_content"
+		android:layout_height="wrap_content"
+		android:text="8:00 AM"
+		android:textColor="@color/letras" />
+		
+		<RadioButton
+		android:layout_width="wrap_content"
+		android:layout_height="wrap_content"
+		android:text="8:30 AM"
+		android:textColor="@color/letras" />
+		
+		<RadioButton
+		android:layout_width="wrap_content"
+		android:layout_height="wrap_content"
+		android:text="9:00 AM"
+		android:textColor="@color/letras" />
+		
+		<RadioButton
+		android:layout_width="wrap_content"
+		android:layout_height="wrap_content"
+		android:text="8:00 AM"
+		android:textColor="@color/letras" />
+		
+		<RadioButton
+		android:layout_width="wrap_content"
+		android:layout_height="wrap_content"
+		android:text="8:30 AM"
+		android:textColor="@color/letras" />
+		
+		<RadioButton
+		android:layout_width="wrap_content"
+		android:layout_height="wrap_content"
+		android:text="9:00 AM"
+		android:textColor="@color/letras" />
+		
+		<RadioButton
+		android:layout_width="wrap_content"
+		android:layout_height="wrap_content"
+		android:text="8:00 AM"
+		android:textColor="@color/letras" />
+		
+		<RadioButton
+		android:layout_width="wrap_content"
+		android:layout_height="wrap_content"
+		android:text="8:30 AM"
+		android:textColor="@color/letras" />
+		
+		<RadioButton
+		android:layout_width="wrap_content"
+		android:layout_height="wrap_content"
+		android:text="9:00 AM"
+		android:textColor="@color/letras" />
+		
+		
+		
+		</RadioGroup>
+		
+		
+		<Button
+		android:id="@+id/btnConfirmAppointment"
+		style="@style/menuButton"
+		android:layout_width="match_parent"
+		android:layout_marginTop="12dp"
+		android:layout_marginBottom="16dp"
+		android:drawableEnd="@drawable/ic_check"
+		android:text="@string/btn_confirm" />
+		
+		</LinearLayout>
+		</android.support.v4.widget.NestedScrollView>
+		
+		</android.support.v7.widget.CardView>
+		
+		
+		</LinearLayout>
+		
+		
+		
+		/******** CODIGO PARA OCULTAR CARDVIEWS ********/
+		
+		btnNext.setOnClickListener {
+			cvStep1.visibility = View.GONE
+			cvStep2.visibility = View.VISIBLE
+		}
+	\end{lstlisting}
+
+	Para mayor funcionamiento poblaremos nuestro spinner con datos ficticios.
+	
+	\lstset{style=mystyle,caption={Poblar spinner con datos de prueba},label=DescriptiveLabel}
+	\begin{lstlisting}
+		// el material spinner arrayAdapter nos pide 3 parametros(contexto, de que forma se mostraran los datos
+		// y finalmente el arreglo de datos)
+		val specialtiesOptions = arrayOf("Specialty A","Specialty B","Specialty C")
+		val adapter = ArrayAdapter<String>(this, android.R.layout.simple_list_item_1,specialtiesOptions)
+		spinnerSpecialties.setAdapter(adapter)
+		
+		
+		val doctorOptions = arrayOf("Medico 1","Medico 2","Medico 3")
+		spinnerDoctors.adapter = ArrayAdapter<String>(this,android.R.layout.simple_list_item_1,doctorOptions)
+		
+	\end{lstlisting}
+	
+	\subsection{DatePicker Dialog}
+	
+	\lstset{style=mystyle,caption={DatePicker XML y DateDIalog},label=DescriptiveLabel}
+	\begin{lstlisting}
+		/***************** XML*******************/
+		 <EditText
+		android:id="@+id/etScheduledDate"
+		android:onClick="onClickScheduledDate"
+		android:inputType="date"
+		android:focusable="false"
+		android:clickable="true"
+		android:maxLines="1"
+		android:layout_width="match_parent"
+		android:layout_height="wrap_content"
+		android:textColor="@color/letras" />
+		
+		/************** KOTLIN *********************/
+		class CreateAppointmentActivity : AppCompatActivity() {
+			val calendar = Calendar.getInstance()
+			
+		
+		fun onClickScheduledDate(v: View){ // creo objeto calendario
+			// obtener el year, mes y dia del mes actual
+			// val calenadar = Calendar.getInstance()
+			val year = calendar.get(Calendar.YEAR)
+			val month = calendar.get(Calendar.MONTH)
+			val dayOfMonth = calendar.get(Calendar.DAY_OF_MONTH)
+			
+			// Esto pasa cuando selecciono un dia //
+			val listener = DatePickerDialog.OnDateSetListener { datePicker, y, m, d ->
+				//Toast.makeText(this,"$y-$m-$d", Toast.LENGTH_SHORT).show()
+				calendar.set(y,m,d)
+				etScheduledDate.setText(resources.getString(R.string.date_format, y, m, d))
+			}
+			// creo un dialogoPicker
+			DatePickerDialog(this, listener, year, month, dayOfMonth).show()
+		}
+		
+	\end{lstlisting}
+
+
+	\subsection{Generar redioButton}
+	
+		\lstset{style=mystyle,caption={Generar radioButtons},label=DescriptiveLabel}
+	\begin{lstlisting}
+		/***************** XML*******************/
+	
+	<RadioGroup
+	android:id="@+id/radioGroup"
+	android:layout_width="match_parent"
+	android:layout_height="wrap_content"
+	android:layout_marginBottom="8dp"
+	android:orientation="vertical">
+	
+	/******* KOTLIN *********/
+	 private fun displayRadioButtons(){
+		val radioButton = RadioButton(this)
+		radioButton.id = View.generateViewId()
+		radioButton.text = "RadioButton 1"
+		radioGroup.addView(radioButton)
+	}
+	
+\end{lstlisting}
+
+	\subsection{RadioGroup multiple columna}
+	
+	
+	\lstset{style=mystyle,caption={DatePicker XML y DateDIalog},label=DescriptiveLabel}
+	\begin{lstlisting}
+		/***************** XML*******************/
+		<LinearLayout
+		android:layout_width="match_parent"
+		android:layout_height="wrap_content"
+		android:orientation="horizontal">
+		
+		<LinearLayout
+		android:id="@+id/radioGroupLeft"
+		android:layout_width="0dp"
+		android:layout_weight="1"
+		android:layout_height="wrap_content"
+		android:layout_marginBottom="8dp"
+		android:orientation="vertical">
+		
+		<RadioButton
+		android:layout_width="wrap_content"
+		android:layout_height="wrap_content"
+		android:text="8:00 AM"
+		android:textColor="@color/letras" />
+		
+		
+		<RadioButton
+		android:layout_width="wrap_content"
+		android:layout_height="wrap_content"
+		android:text="8:00 AM"
+		android:textColor="@color/letras" />
+		
+		
+		</LinearLayout>
+		
+		
+		<LinearLayout
+		android:id="@+id/radioGroupRight"
+		android:layout_width="0dp"
+		android:layout_weight="1"
+		android:layout_height="wrap_content"
+		android:layout_marginBottom="8dp"
+		android:orientation="vertical">
+		
+		<RadioButton
+		android:layout_width="wrap_content"
+		android:layout_height="wrap_content"
+		android:text="8:00 AM"
+		android:textColor="@color/letras" />
+		
+		
+		<RadioButton
+		android:layout_width="wrap_content"
+		android:layout_height="wrap_content"
+		android:text="8:00 AM"
+		android:textColor="@color/letras" />
+		
+		
+		</LinearLayout>
+		
+		</LinearLayout>
+		
+		
+		/************** KOTLIN *********************/
+		private fun displayRadioButtons(){
+			// limpiar los radioButton ya existentes
+			//radioGroup.clearCheck()
+			selectedRadioButton = null
+			// limpiar los elementos ya puestos
+			radioGroupLeft.removeAllViews()
+			radioGroupRight.removeAllViews()
+			
+			val hours = arrayOf("3:00 PM","3:30 PM","4:00 PM", "4:30 PM")
+			var goToLeft = true
+			
+			hours.forEach {
+				val radioButton = RadioButton(this)
+				radioButton.id = View.generateViewId()
+				radioButton.text = it
+				
+				// desmarcar los radio buton y marcar al que hizimos click
+				radioButton.setOnClickListener{ view->
+					selectedRadioButton?.isChecked = false
+					selectedRadioButton = view as RadioButton?
+					selectedRadioButton?.isChecked = true
+				}
+				if(goToLeft)
+				radioGroupLeft.addView(radioButton)
+				else
+				radioGroupRight.addView(radioButton)
+				goToLeft = !goToLeft
+			}
+			
+			// obtener el id del radioButton Marcado
+			//radioGroup.checkedRadioButtonId
+			
+		}
+			
+		\end{lstlisting}
+		
+    
+	
+		\section{Mis cítas en Android}
+		
+		Para la pantalla de mis citas implementaremos un RecyclerView cabe mencionar que para hacer esto es necesario implementar un adaptador y una clase de citas ademas una vista que complementara.
+		
+		\lstset{style=mystyle,caption={RecyclerView Citas},label=DescriptiveLabel}
+		\begin{lstlisting}
+			/***************** XML layout_appointments*******************/
+			<?xml version="1.0" encoding="utf-8"?>
+			<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+			xmlns:app="http://schemas.android.com/apk/res-auto"
+			xmlns:tools="http://schemas.android.com/tools"
+			android:layout_width="match_parent"
+			android:layout_height="match_parent"
+			android:orientation="vertical"
+			android:background="@drawable/bg_gradient"
+			tools:context=".AppointmentsActivity">
+			
+			<TextView
+			android:layout_marginTop="12dp"
+			android:layout_width="match_parent"
+			android:layout_height="wrap_content"
+			android:textColor="@color/white"
+			style="@style/Base.TextAppearance.AppCompat.Medium"
+			android:gravity="center_horizontal"
+			android:text="@string/my_appointments"/>
+			
+			<android.support.v7.widget.RecyclerView
+			android:id="@+id/rvAppointments"
+			tools:listItem="@layout/item_appointment"
+			android:padding="6dp"
+			android:layout_width="match_parent"
+			android:layout_height="match_parent">
+			
+			</android.support.v7.widget.RecyclerView>
+			
+			</LinearLayout>
+			
+			
+			/**************************** Item_appointment*****************/
+			<?xml version="1.0" encoding="utf-8"?>
+			<android.support.v7.widget.CardView xmlns:android="http://schemas.android.com/apk/res/android"
+			xmlns:tools="http://schemas.android.com/tools"
+			android:layout_width="match_parent"
+			android:layout_height="wrap_content"
+			xmlns:app="http://schemas.android.com/apk/res-auto"
+			android:orientation="vertical"
+			android:gravity="center"
+			android:padding="16dp"
+			android:background="@drawable/bg_gradient"
+			app:cardUseCompatPadding="true"
+			app:cardElevation="4dp"
+			app:cardCornerRadius="3dp"
+			tools:context=".MenuActivity">
+			
+			<LinearLayout
+			android:orientation="vertical"
+			android:padding="6dp"
+			android:layout_width="match_parent"
+			android:layout_height="wrap_content">
+			
+			<TextView
+			android:layout_width="match_parent"
+			android:layout_height="wrap_content"
+			android:id="@+id/tvAppointmentId"
+			tools:text="Cita Medica # 7"/>
+			
+			<TextView
+			android:layout_width="match_parent"
+			android:layout_height="wrap_content"
+			android:id="@+id/tvDoctorName"
+			tools:text="Medico Test"
+			android:gravity="center_horizontal"
+			style="@style/Base.TextAppearance.AppCompat.Medium"/>
+			
+			<TextView
+			android:layout_width="match_parent"
+			android:layout_height="wrap_content"
+			android:gravity="center_horizontal"
+			android:id="@+id/tvScheduledDate"
+			tools:text="Atencion el dia 12/12/2021"/>
+			
+			<TextView
+			android:layout_width="match_parent"
+			android:layout_height="wrap_content"
+			android:gravity="center_horizontal"
+			android:id="@+id/tvScheduledTime"
+			tools:text="A las 3:00 PM"/>
+			
+			
+			
+			
+			</LinearLayout>
+			
+			
+			
+			</android.support.v7.widget.CardView>
+			
+			
+			
+			/***************** ACTIVITY MY_APPOINTMENTS *************/
+			package com.lopez.samuel.myappointment
+			
+			import android.support.v7.app.AppCompatActivity
+			import android.os.Bundle
+			import android.support.v7.widget.LinearLayoutManager
+			import com.lopez.samuel.myappointment.model.Appointment
+			import kotlinx.android.synthetic.main.activity_appointments.*
+			
+			class AppointmentsActivity : AppCompatActivity() {
+				
+				override fun onCreate(savedInstanceState: Bundle?) {
+					super.onCreate(savedInstanceState)
+					setContentView(R.layout.activity_appointments)
+					
+					
+					rvAppointments.layoutManager = LinearLayoutManager(this) // va ser lineal // gridLinealManager
+					
+					val appointments = ArrayList<Appointment>()
+					appointments.add(Appointment(1,"Medico Test","12/12/2021","4:00 PM"))
+					appointments.add(Appointment(2,"Medico Test","12/12/2021","4:00 PM"))
+					appointments.add(Appointment(3,"Medico Test","12/12/2021","4:00 PM"))
+					
+					rvAppointments.adapter = AppointmentAdapter(appointments)
+				}
+			}
+			
+			
+			
+			/*************** ADAPTADOR APPOINTMENTS *********************/
+			
+			package com.lopez.samuel.myappointment
+			
+			import android.support.v7.widget.RecyclerView
+			import android.view.LayoutInflater
+			import android.view.View
+			import android.view.ViewGroup
+			import com.lopez.samuel.myappointment.model.Appointment
+			import kotlinx.android.synthetic.main.item_appointment.view.*
+			
+			class AppointmentAdapter(private val appointments: ArrayList<Appointment>): RecyclerView.Adapter<AppointmentAdapter.ViewHolder>(){
+				
+				// representa nuestra vista
+				class ViewHolder(itemView: View): RecyclerView.ViewHolder(itemView) {
+					
+					fun bind(appointment: Appointment) =
+					// estamos accediendo solo al objeto itemView
+					with(itemView){
+						tvAppointmentId.text = context.getString(R.string.item_appointment_id,appointment.id)
+						tvDoctorName.text = appointment.doctorName
+						tvScheduledDate.text = context.getString(R.string.item_appointment_date,appointment.scheduledDate)
+						tvScheduledTime.text = context.getString(R.string.item_appointment_time,appointment.scheduledTime)
+					}
+					
+				}
+				
+				// inflate XML items
+				override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
+					return ViewHolder(
+					LayoutInflater.from(parent.context).inflate(R.layout.item_appointment, parent, false)
+					)
+				}
+				
+				// Number of Elements
+				override fun getItemCount() = appointments.size
+				
+				
+				// Bind to fate with data
+				override fun onBindViewHolder(holder: ViewHolder, position: Int) {
+					val appointment = appointments[position]
+					
+					holder.bind(appointment)
+					
+				}
+			}
+		
+		
+		/********************* MODELO APPOINTMENT********************/
+		package com.lopez.samuel.myappointment.model
+		
+		data class Appointment (
+		val id: Int,
+		val doctorName: String,
+		val scheduledDate: String,
+		val scheduledTime: String
+		
+		)
+			
+		\end{lstlisting}
+	
+	
+		\section{Navigation entre pantallas}
+		
+		En esta parte se tratara todos los apectos para que la aplicación sea consistente, empezando por los retornos o botones de anterior. Al asignarle un padre automaticamente se pone visible un boton de volver al padre
+		
+		\subsection{BackButton}
+		
+			\lstset{style=mystyle,caption={Back boton mediante parent},label=DescriptiveLabel}
+		\begin{lstlisting}
+			<?xml version="1.0" encoding="utf-8"?>
+			<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+			package="com.lopez.samuel.myappointment">
+			
+			<application
+			android:allowBackup="true"
+			android:icon="@mipmap/ic_launcher"
+			android:label="@string/app_name"
+			android:roundIcon="@mipmap/ic_launcher_round"
+			android:supportsRtl="true"
+			android:theme="@style/AppTheme">
+			<activity android:name=".AppointmentsActivity"
+			android:parentActivityName=".MenuActivity"></activity>
+			
+			<activity android:name=".CreateAppointmentActivity"
+			android:parentActivityName=".MenuActivity"/>
+			
+			<activity android:name=".MenuActivity" />
+			<activity android:name=".RegisterActivity" />
+			<activity android:name=".MainActivity">
+			<intent-filter>
+			<action android:name="android.intent.action.MAIN" />
+			
+			<category android:name="android.intent.category.LAUNCHER" />
+			</intent-filter>
+			</activity>
+			</application>
+			
+			</manifest>
+		\end{lstlisting}
+	
+		
+		\subsection{Una sola actividad y cerrar la actual cuando abrimos otra }
+		
+		Para cerrar la activity actual se pone finish() despues del startActivity(intent) y para que solo cree una instancia se necesita meter en el manifest en cada actividad se pone android:launchMode="singleInstance".
+		
+		\subsection{Persistencia de datos SharedPreference}
+		
+		\lstset{style=mystyle,caption={Shared Prefrence login y logout},label=DescriptiveLabel}
+		\begin{lstlisting}
+			val preferences = getSharedPreferences("general", Context.MODE_PRIVATE)
+			val session = preferences.getBoolean("session",false)
+			
+			if(session)
+			goToMenuActivity()
+			
+			btnLogin.setOnClickListener {
+				// validar en servidor
+				createSessionPreference()
+				goToMenuActivity()
+			}
+		
+			
+			private fun createSessionPreference(){
+				val preferences = getSharedPreferences("general", Context.MODE_PRIVATE)
+				val editor = preferences.edit()
+				editor.putBoolean("session",true)
+				editor.apply()
+				
+			}
+		
+		
+		
+		
+		
+		btnLogout.setOnClickListener {
+			clearSessionPreference()
+			val intent = Intent(this,MainActivity::class.java)
+			startActivity(intent)
+			finish()
+			
+		}
+	
+	
+	 private fun clearSessionPreference(){
+		val preferences = getSharedPreferences("general", Context.MODE_PRIVATE)
+		val editor = preferences.edit()
+		editor.putBoolean("session",false)
+		editor.apply()
+		
+	}
+		\end{lstlisting}
+		
+		
+		\subsection{Mejora del SharedPreference}
+		Se utilizara un object en vez de un class estó da una diferencia de ya no crear clase si no usarlo como metodo estatico, pero tampoco contiene un constructor.
+		
+			\lstset{style=mystyle,caption={Mejora},label=DescriptiveLabel}
+		\begin{lstlisting}
+			/***************** CLASE PREFERENT *******************/
+			package com.lopez.samuel.myappointment
+			
+			
+			import android.content.Context
+			import android.content.SharedPreferences
+			import android.preference.PreferenceManager
+			
+			object PreferenceHelper {
+				
+				fun defaultPrefs(context: Context): SharedPreferences
+				= PreferenceManager.getDefaultSharedPreferences(context)
+				
+				fun customPrefs(context: Context, name: String): SharedPreferences
+				= context.getSharedPreferences(name, Context.MODE_PRIVATE)
+				
+				private inline fun SharedPreferences.edit(operation: (SharedPreferences.Editor) -> Unit) {
+					val editor = this.edit()
+					operation(editor)
+					editor.apply()
+				}
+				
+				/**
+				* puts a value for the given [key].
+				*/
+				operator fun SharedPreferences.set(key: String, value: Any?)
+				= when (value) {
+					is String? -> edit { it.putString(key, value) }
+					is Int -> edit { it.putInt(key, value) }
+					is Boolean -> edit { it.putBoolean(key, value) }
+					is Float -> edit { it.putFloat(key, value) }
+					is Long -> edit { it.putLong(key, value) }
+					else -> throw UnsupportedOperationException("Not yet implemented")
+				}
+				
+				/**
+				* finds a preference based on the given [key].
+				* [T] is the type of value
+				* @param defaultValue optional defaultValue - will take a default defaultValue if it is not specified
+				*/
+				inline operator fun <reified T : Any> SharedPreferences.get(key: String, defaultValue: T? = null): T
+				= when (T::class) {
+					String::class -> getString(key, defaultValue as? String ?: "") as T
+					Int::class -> getInt(key, defaultValue as? Int ?: -1) as T
+					Boolean::class -> getBoolean(key, defaultValue as? Boolean ?: false) as T
+					Float::class -> getFloat(key, defaultValue as? Float ?: -1f) as T
+					Long::class -> getLong(key, defaultValue as? Long ?: -1) as T
+					else -> throw UnsupportedOperationException("Not yet implemented")
+				}
+			}
+		
+		
+		
+		
+		/*********************** CLASE MAIN *********************/
+		val preferences = PreferenceHelper.defaultPrefs(this) // va ser por default
+		
+		if(preferences["session",false])
+		goToMenuActivity()
+		
+		
+		 private fun createSessionPreference(){
+			/*
+			val preferences = getSharedPreferences("general", Context.MODE_PRIVATE)
+			val editor = preferences.edit()
+			editor.putBoolean("session",true)
+			editor.apply()
+			*/
+			val preferences = PreferenceHelper.defaultPrefs(this)
+			preferences["session"] = true
+			
+		}
+	
+	
+	
+		private fun clearSessionPreference(){
+			/*val preferences = getSharedPreferences("general", Context.MODE_PRIVATE)
+			val editor = preferences.edit()
+			editor.putBoolean("session",false)
+			editor.apply()*/
+			
+			val preferences = PreferenceHelper.defaultPrefs(this)
+			preferences["session"] = false
+			
+			
+		}
+		\end{lstlisting}
+		
+		
+	
+	\subsection{Snackbar by Lazy}
+	Para esto debemos sobrescribir el metodo onBackPress() que sirve para cuando presionamos la tecla de ir para atras, cada que se presione ese boton se va a mostrar un snackbar para confirmar la salida, para hacer uso de la clase Snackbar es necesario añadir una dependencia "design", para generar un snackbar se tienen que pasar tres parametros, el primero es la vista, el segundo es el texto y el ultimo el tiempo que se ejecutara, tambien se le tiene que dar un id a el layout donde se va a mostrar, al presionar el metdo onBackPress y ver que el snackbar ya esta visible entonces se sale de la app.
+	
+	\lstset{style=mystyle,caption={SnackBar by Lazy},label=DescriptiveLabel}
+	\begin{lstlisting}
+		private val snackbar = SnackBar(vista, texto, duracion)
+		
+		overrive fun onBackPressed(){
+			if(snackbar.isShow()){
+				super.onBackPressed()
+			}else{
+				snackbar.show()
+			}
+		}
+	
+	\end{lstlisting}
+	
+	
+	
+	\subsection{Autenticación JWT}
+	
+	Encoding consiste en transformar datos de un formato a otro, no busca mantener la información secreta se puede revertir facilmente no requiere de una clave, la encriptación tambien transofrma datos en otro formato pero la diferencia es que no cualuquiera puede regresar esa información a su valor original, la meta es que los datos no sean consumidos por otros usuarios a los que no fue destinada, tiene una clave secreta, El hasing no hay una encriptación y una desencriptación, solo es identifcar si ha sifo alterado y que el destinatario sepa si fue modificado, la entrada es la misma siemore va ser el mismo resultado, no es reversible. Tambien podemos ofuscar el codigo que significa que las variables no describen lo que hacen y no tienen saltos de linea.
+	
+	Hay muchas maneras de autenticar, una manera es la autentificación basada en tokens, en el servidor no se guardar ningun token simplemente se asegurara que sea valido el token, simplemente se firma y atravez de esta firma el servidor verifica si es valido y fue emitido poe el.
+	
+	El usuario ingresa sus credenciales, el servidor verifica si son correctas y genera un token firmado (jwt), este token puede contener los datos en su interior, ese token se guarda del lado del cliente (preferencias en android), para pedir información privada se pide el token. se puede mandar mediante un Autoriztion Header,
+	
+	El token esta compuesto de un Header, un payload y un asignature,paso 1.-  header.payload.asignature, el header contiene el tipo y el algoritmo, 2.-payload contiene cleans, son datos que contiene información, iss nombre o dominio, sub descripcion exp cuando va expirar el token, 3.- crear la firma, se codifica el header y el payload con un algoritmo base64 y se concatnan, luego a ese resultado se aplica un algoritmo de hasing y con un secret, despues se vuelve a hasiar y se obtiene la firma, se firma en el servidor porque el tiene una llave privada, 4.- juntar todo el header el payload y la firma.
+	
+	\subsubsection{JWT con Passport}
+	
+	
+	Client ID: 1
+	Client secret: AXBsF1DQEVYebFYqibVEMIYXDOGqIJ3i36Q2Dl47
+	Password grant client created successfully.
+	Client ID: 2
+	Client secret: NIhVFJ418CP7ynImVfPK64RhgdhSqk7nRgHOqwKn
+	
+	
+	\section{Retrofit con Kotlin}
+	
+	Para instalar Kotlin fue necesario copiar y pegar en el build.grade la siguiente dependencia es implementation 'com.squareup.retrofit2:retrofit:2.3.0' pero tambien tiene otra dependencia que ayuda a convertir los objetos Json que vienen del servidor a Objetos Kotlin automaticamente esa dependencia es implementation 'com.squareup.retrofit2:converter-gson:2.3.0', tambien es necesario darle permisos a la aplicación de internet este permiso se pone en el manifest uses-permission android:name='android.permission.INTERNET'. 
+	Primero vamos a crear una interfaz kotlin para usar la dependencia Retrofit. usamos una retorno Call para obtener los resultados del Json, usamos object Factory en vez de class Factory para que sea utilizado como statico y no sea necesario utilizar instancias. la ruta specialties retorna la lista de specialties registradas en la base de datos por ello se retorna call. Para que mi servidor corra con la ip le pongo php artisan serve --host=192.168.1.66
+	
+	\lstset{style=mystyle,caption=Interfaz ApiService,label=DescriptiveLabel}
+	\begin{lstlisting}
+		import retrofit2.Call
+		import retrofit2.Retrofit
+		import retrofit2.converter.gson.GsonConverterFactory
+		import retrofit2.http.GET
+		
+		interface ApiService {
+			
+			@GET("specialties")
+			abstract fun getSpecialties(): Call<ArrayList<Specialty>>
+			
+			
+			companion object Factory{
+				private const val BASE_URL = "http://192.168.1.66:800/api/"
+				
+				fun create(): ApiService {
+					val retrofit = Retrofit.Builder()
+					.baseUrl(BASE_URL)
+					.addConverterFactory(GsonConverterFactory.create())
+					.build()
+					return retrofit.create(ApiService::class.java)
+				}
+			}
+		}
+	
+	
+		/********************** CLASE SPECIALTY ********************/
+		package com.lopez.samuel.myappointment.model
+		
+		data class Specialty(val id: Int, val name: String)	{
+			override fun toString(): String {
+				return name 
+			}
+		}
+		
+		/********************** CLASE Appointment ********************/
+		package com.lopez.samuel.myappointment.model
+		
+		data class Appointment (
+		val id: Int,
+		val doctorName: String,
+		val scheduledDate: String,
+		val scheduledTime: String
+		
+		)
+	\end{lstlisting}
+	
+	Primero llamaeros las pespecialidades con el siguiente codigo. perimero hare una instancia de apiService para que solo se utilize una vez con un lazy o una carga presoza.
+	
+
+		\lstset{style=mystyle,caption=Spinner de especialidades,label=DescriptiveLabel}
+	\begin{lstlisting}
+		  private val apiService: ApiService by lazy{
+			ApiService.create()
+		}
+		
+		
+		/************** CARGAR SPINNER DE ESPECIALIDADES ************************/
+		private fun loadSpecialties(){
+			val call = apiService.getSpecialties()
+			call.enqueue(object: Callback<ArrayList<Specialty>>{
+				override fun onFailure(call: Call<ArrayList<Specialty>>, t: Throwable) {
+					Toast.makeText(this@CreateAppointmentActivity,getString(R.string.error_loading_speialties), Toast.LENGTH_SHORT).show()
+					finish()
+				}
+				
+				override fun onResponse(call: Call<ArrayList<Specialty>>, response: Response<ArrayList<Specialty>>) {
+					if(response.isSuccessful){ // cuando es correcto esta entre 200 y 300
+						val specialties = response.body() // obtenemos un arrayList de especialidades
+						
+						val specialyOptions = ArrayList<String>()
+						specialties?.forEach{
+							specialyOptions.add(it.name)
+						}
+						spinnerSpecialties.adapter = ArrayAdapter<String>(this@CreateAppointmentActivity, android.R.layout.simple_list_item_1,specialyOptions)
+					}
+				}
+				
+			})
+			
+			
+		}
+	\end{lstlisting}
+
+	Ahora mandaremos llamar a los médicos de acuerdo a una especialidad en este caso utilizremos un clickSelecteItem para cuando se haga un modificacion del spinner specialidades entonces se mande a llamar la ruta y asi llenamos el spinner de medicos. Pero tambien vamos a definir que el metodo toString de especialidades solo muestre el nombre.
+	
+	\lstset{style=mystyle,caption=Spinner de medicos,label=DescriptiveLabel}
+	\begin{lstlisting}
+		private val apiService: ApiService by lazy{
+			ApiService.create()
+		}
+		
+		
+		/************** API Medicos segun la especialidad ****************************/
+		@GET("specialties/{specialty}/doctors")
+		abstract fun getDoctors(@Path("specialty") specialtyId: Int): Call<ArrayList<Doctor>>
+		
+		
+		
+		/************** Esperar cambios del spinner specialties ************************/
+		private fun listenSpecialtyCHange(){
+			// obtengo el id del spinner Specialties
+			spinnerSpecialties.onItemSelectedListener = object: AdapterView.OnItemSelectedListener{
+				override fun onNothingSelected(parent: AdapterView<*>?) {
+					
+				}
+				
+				override fun onItemSelected(adapter: AdapterView<*>?, view: View?, position: Int, id: Long) {
+					// adapter nos permitira ingresar a los id
+					val specialty = adapter?.getItemAtPosition(position) as Specialty
+					Toast.makeText(this@CreateAppointmentActivity, "Id: ${specialty.id}", Toast.LENGTH_SHORT).show()
+					loadDoctors(specialty.id)
+				}
+				
+			}
+		}
+	
+	
+	/****************************** CARGAR SPINNER DOCTOR ******************/
+	private fun loadDoctors(SpecialtyId: Int){
+		val call = apiService.getDoctors(SpecialtyId)
+		call.enqueue(object: Callback<ArrayList<Doctor>>{
+			override fun onFailure(call: Call<ArrayList<Doctor>>, t: Throwable) {
+				Toast.makeText(this@CreateAppointmentActivity,getString(R.string.error_loading_doctors), Toast.LENGTH_SHORT).show()
+				
+			}
+			
+			override fun onResponse(call: Call<ArrayList<Doctor>>, response: Response<ArrayList<Doctor>>) {
+				if(response.isSuccessful){ // cuando es correcto esta entre 200 y 300
+					val doctors = response.body() // obtenemos un arrayList de especialidades
+					
+					spinnerDoctors.adapter = ArrayAdapter<Doctor>(this@CreateAppointmentActivity, android.R.layout.simple_list_item_1,doctors)
+				}
+			}
+			
+		})
+		
+	}
+		
+	\end{lstlisting}
+	
+	
+	
+	
+	
+	
+	
+\end{document}

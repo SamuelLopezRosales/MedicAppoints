@@ -9,7 +9,7 @@
             </a>
           </li>
           <li class="nav-item">
-            <a class="nav-link" href="/doctors">
+            <a class="nav-link" href="/patients">
               <i class="ni ni-single-02 text-orange"></i> Mis pacientes
             </a>
    </li>

@@ -21,6 +21,24 @@ class UserTableSeeder extends Seeder
     		'phone' => '',
     		'role' => 'admin'
     	]);
-        factory(User::class,50)->create();
+        User::create([
+            'name' => 'medico',
+            'email' => 'samy-messi10@hotmail.com',
+            'password' => bcrypt('Barcelona#123'),
+            'dni' => '12345678',
+            'address' => '',
+            'phone' => '',
+            'role' => 'doctor'
+        ]);
+        User::create([
+            'name' => 'Paciente',
+            'email' => 'paciente@paciente.com',
+            'password' => bcrypt('Barcelona#123'),
+            'dni' => '12345678',
+            'address' => '',
+            'phone' => '',
+            'role' => 'patient'
+        ]);
+        factory(User::class,50)->states('patient')->create();
     }
 }
