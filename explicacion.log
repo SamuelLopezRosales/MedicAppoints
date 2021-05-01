@@ -1,4 +1,4 @@
-This is pdfTeX, Version 3.14159265-2.6-1.40.21 (MiKTeX 20.11) (preloaded format=pdflatex 2020.11.22)  29 APR 2021 21:31
+This is pdfTeX, Version 3.14159265-2.6-1.40.21 (MiKTeX 20.11) (preloaded format=pdflatex 2020.11.22)  30 APR 2021 14:24
 entering extended mode
 **./explicacion.tex
 (explicacion.tex
@@ -795,6 +795,12 @@ LaTeX Warning: Label `DescriptiveLabel' multiply defined.
 
 LaTeX Warning: Label `DescriptiveLabel' multiply defined.
 
+
+LaTeX Warning: Label `DescriptiveLabel' multiply defined.
+
+
+LaTeX Warning: Label `DescriptiveLabel' multiply defined.
+
 )
 \openout1 = `explicacion.aux'.
 
@@ -931,7 +937,7 @@ Overfull \hbox (185.1676pt too wide) in paragraph at lines 2354--2359
 ient se-cret: NIhVFJ418CP7ynImVfPK64RhgdhSqk7nRgHOqwKn 
  []
 
-[45] [46] [47] [48] (explicacion.aux
+[45] [46] [47] [48] [49] [50] (explicacion.aux
 LaTeX Info: Redefining \. on input line 8.
 LaTeX Info: Redefining \% on input line 8.
 )
@@ -957,9 +963,9 @@ s/MiKTeX/fonts/type1/public/amsfonts/cm/cmr17.pfb><C:/Users/samue/AppData/Local
 /Programs/MiKTeX/fonts/type1/public/amsfonts/cm/cmr5.pfb><C:/Users/samue/AppDat
 a/Local/Programs/MiKTeX/fonts/type1/public/amsfonts/cm/cmsy10.pfb><C:/Users/sam
 ue/AppData/Local/Programs/MiKTeX/fonts/type1/public/amsfonts/cm/cmtt8.pfb>
-Output written on explicacion.pdf (48 pages, 282790 bytes).
+Output written on explicacion.pdf (50 pages, 290395 bytes).
 PDF statistics:
- 197 PDF objects out of 1000 (max. 8388607)
+ 204 PDF objects out of 1000 (max. 8388607)
  0 named destinations out of 1000 (max. 500000)
  13 words of extra memory for PDF output out of 10000 (max. 10000000)
 

@@ -2506,6 +2506,103 @@
 	\end{lstlisting}
 	
 	
+	Para cargar las horas es necesario seleccionar una fecha y un médico y saldran las horas en las que puede atender dicho médico.
+	
+	\lstset{style=mystyle,caption=Desplegar horas,label=DescriptiveLabel}
+	\begin{lstlisting}
+		/******************* API HORAS *************************************/
+		@GET("schedule/hours")
+		abstract fun getHours(@Query("doctor_id") doctorId: Int, @Query("date") date: String): Call<Schedule>
+
+		
+		/****************** ESPERAR CAMBIOS DEL SPINNER MEDICO Y FECHA ***********/
+		   private fun listenDoctorAndDateChange(){
+			// medicos
+			spinnerDoctors.onItemSelectedListener = object: AdapterView.OnItemSelectedListener{
+				override fun onNothingSelected(parent: AdapterView<*>?) {
+					// en caso de no tener ningun elemento seleccionado
+				}
+				
+				override fun onItemSelected(adapter: AdapterView<*>?, view: View?, position: Int, id: Long) {
+					val doctor = adapter?.getItemAtPosition(position) as Doctor
+					loadHours(doctor.id, etScheduledDate.text.toString())
+				}
+				
+			}
+			
+			// fechas
+			etScheduledDate.addTextChangedListener(object: TextWatcher{
+				override fun afterTextChanged(s: Editable?) {
+					// DESPUES DE QUE EL TEXTO CAMBIO
+				}
+				
+				override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {
+					// ANTES DE QUE EL TEXTO CAMBIO
+				}
+				
+				override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
+					// CUANDO EL TEXTO CAMBIO
+					val doctor = spinnerDoctors.selectedItem as Doctor
+					loadHours(doctor.id, etScheduledDate.text.toString())
+				}
+				
+			})
+			
+		}
+	
+	
+	
+	/*********************** FUNCION CARGAR HORAS *****************/
+	private fun loadHours(doctorId: Int, date: String){
+		if(date.isEmpty()){
+			return
+		}
+		
+		val call = apiService.getHours(doctorId,date)
+		call.enqueue(object: Callback<Schedule>{
+			override fun onFailure(call: Call<Schedule>, t: Throwable) {
+				Toast.makeText(this@CreateAppointmentActivity, getString(R.string.error_loading_hours), Toast.LENGTH_SHORT).show()
+				
+			}
+			
+			override fun onResponse(call: Call<Schedule>, response: Response<Schedule>) {
+				if(response.isSuccessful){
+					val schedule = response.body()
+					schedule?.let{
+						
+						tvSelectDoctorAndDate.visibility = View.GONE
+						val intervals = it.morning + it.afternoon
+						val hours = ArrayList<String>()
+						intervals.forEach{interval ->
+							hours.add(interval.start)
+						}
+						displayRadioButtons(hours)
+					}
+					
+					//Toast.makeText(this@CreateAppointmentActivity,"Morning: ${schedule?.morning?.size} - Afternoon: ${schedule?.afternoon?.size}", Toast.LENGTH_SHORT).show()
+				}
+			}
+			
+		})
+	}		
+
+
+	/************************* MODELOS *******************/
+	package com.lopez.samuel.myappointment.model
+	
+	data class Schedule(val morning: ArrayList<HourInterval>, val afternoon: ArrayList<HourInterval>)
+	
+	
+	package com.lopez.samuel.myappointment.model
+	
+	data class HourInterval(val start: String, val end: String){
+		override fun toString(): String {
+			return "$start - $end"
+		}
+	}
+	\end{lstlisting}
+	
+	
 	
 	
 	

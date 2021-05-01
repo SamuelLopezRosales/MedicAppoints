@@ -36,8 +36,8 @@ $.getJSON(url, displayHours);
 }
 
 function displayHours(data){
-  if(!data.morning && !data.afternoon){
-    console.log("No se encontraron horas para el medico ese dia ");
+  if(!data.morning && !data.afternoon ||
+   data.morning.length===0 && data.afternoon.length===0){
     $hours.html(noHoursAlert);
     return;
   }

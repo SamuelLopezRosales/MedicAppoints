@@ -51,4 +51,28 @@ class User extends Authenticatable
      public function scopeDoctors($query){
         return $query->where('role','doctor');
     }
+
+    // $user->asPatientAppointments  ->requestedAppointments
+    // $user->asDoctorAppointments -> attendedAppointments
+    public function asDoctorAppoitnments()
+    {
+        return $this->hasMany(Appointment::class,'doctor_id');
+    }
+
+    public function asPatientAppointments()
+    {
+        return $this->hasMany(Appointment::class, 'patient_id');
+    }
+
+    public function attendedAppointments()
+    {
+        return $this->asDoctorAppoitnments()->where('status','Atendida');
+    }
+
+     public function cancelledAppointments()
+    {
+        return $this->asDoctorAppoitnments()->where('status','Cancelada');
+    }
+
+
 }

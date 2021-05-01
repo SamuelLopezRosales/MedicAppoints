@@ -46,6 +46,7 @@ class AuthController extends Controller
         // AUTH ME DEVOLVERA FALSO SI NO ESTAN LOS VALORES
         if (!Auth::attempt($credentials)) // valida si estan las credenciale
             return response()->json([
+                'success' => false,
                 'message' => 'Unauthorized'
             ], 401);
 
@@ -58,6 +59,8 @@ class AuthController extends Controller
         $token->save();
 
         return response()->json([
+            'success' => true,
+            'user' => $user,
             'access_token' => $tokenResult->accessToken,
             'token_type' => 'Bearer',
             'expires_at' => Carbon::parse($token->expires_at)->toDateTimeString()
