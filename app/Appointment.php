@@ -3,9 +3,10 @@
 namespace App;
 
 use Illuminate\Database\Eloquent\Model;
-use App\Specialty;
-use App\User;
+//use App\Specialty;
+//use App\User;
 use Carbon\Carbon;
+use Illuminate\Http\Request;
 
 class Appointment extends Model
 {
@@ -15,6 +16,7 @@ class Appointment extends Model
     	'doctor_id',
     	'patient_id',
     	'scheduled_date',
+        'scheduled_time',
     	'type'
     ];
 
@@ -48,6 +50,20 @@ class Appointment extends Model
     // cuando es una relacion 1 a 1 de un lado es hasOne y del otro belongsTo
     public function cancellation(){
         return $this->hasOne(CancelledAppointment::class);
+    }
+
+    static public function createForPatient(Request $request,$patientId){
+        $data = $request->only('description',
+        'specialty_id',
+        'doctor_id',
+        'patient_id',
+        'scheduled_date',
+        'scheduled_time',
+        'type');
+        $data['patient_id'] = $patientId;
+        $carbonTime = $data['scheduled_time'] = Carbon::createFromFormat('g:i A',$data['scheduled_time']);
+        $data['scheduled_time'] = $carbonTime->format('H:i:s');
+        self::create($data);
     }
 
 }

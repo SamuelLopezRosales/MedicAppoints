@@ -37,7 +37,7 @@ Route::get('/specialties/{specialty}/doctors','SpeicaltyController@doctors');
 // devuleve las horas segun el medico y el dia
 Route::get('/schedule/hours','ScheduleController@hours');
 
-Route::get('/appointments','AppointmentController@index');
+
 
 
 Route::middleware('auth:api')->group(function() {
@@ -46,5 +46,6 @@ Route::middleware('auth:api')->group(function() {
 
     // APPOINTMENTS
     Route::post('/appointments','AppointmentController@store');
+    Route::get('/appointments','AppointmentController@index');
 });
 
