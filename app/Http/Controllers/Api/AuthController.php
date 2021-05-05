@@ -6,6 +6,9 @@ use Illuminate\Http\Request;
 use App\Http\Controllers\Controller;
 use Auth;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\Validator;
+use Illuminate\Auth\Events\Registered;
+use App\User;
 
 class AuthController extends Controller
 {
@@ -92,6 +95,30 @@ class AuthController extends Controller
     public function prueba()
     {
         return "Esto es una prueba";
+    }
+
+    public function register(Request $request){
+        $this->validator($request->all())->validate();
+
+        event(new Registered($user = $this->create($request->all())));
+
+        //Auth::guard('api')->login($user);
+        Auth::guard('api')->user();
+
+        $tokenResult = $user->createToken('Personal Access Token');
+        $access_token = $tokenResult->accessToken;
+        $success = true;
+
+        return compact('success','user','access_token');
+    }
+
+    protected function validator(array $data){
+        return Validator::make($data,User::$rules);
+    }
+
+    protected function create(array $data)
+    {
+        return User::createPatient($data);
     }
 }
 

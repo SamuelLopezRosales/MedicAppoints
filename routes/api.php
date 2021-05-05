@@ -28,6 +28,7 @@ Route::group([
 Route::get('prueba', 'AuthController@prueba');
 Route::post('signup', 'AuthController@signUp');
 Route::post('login', 'AuthController@login');
+Route::post('register', 'AuthController@register');
 
 
 // devuelve la lista de especialidades
@@ -47,5 +48,6 @@ Route::middleware('auth:api')->group(function() {
     // APPOINTMENTS
     Route::post('/appointments','AppointmentController@store');
     Route::get('/appointments','AppointmentController@index');
+    Route::post('/fcm/token','FirebaseController@postToken');
 });
 
